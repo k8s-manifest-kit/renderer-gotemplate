@@ -4,7 +4,7 @@ go 1.24.8
 
 require (
 	github.com/k8s-manifest-kit/engine v0.0.0-20251102210517-1f00c62c5137
-	github.com/k8s-manifest-kit/pkg v0.0.0-20251102194245-01587c2f97da
+	github.com/k8s-manifest-kit/pkg v0.0.0-20251103163058-683e9e0554ec
 	github.com/lburgazzoli/gomega-matchers v0.1.2
 	github.com/onsi/gomega v1.38.2
 	github.com/rs/xid v1.6.0
