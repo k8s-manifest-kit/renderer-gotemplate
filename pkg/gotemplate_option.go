@@ -4,8 +4,6 @@ import (
 	"github.com/k8s-manifest-kit/engine/pkg/types"
 	"github.com/k8s-manifest-kit/pkg/util"
 	"github.com/k8s-manifest-kit/pkg/util/cache"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // RendererOption is a generic option for RendererOptions.
@@ -19,15 +17,11 @@ type RendererOptions struct {
 	// Transformers are renderer-specific transformers applied during Process().
 	Transformers []types.Transformer
 
-	// Cache is a custom cache implementation for render results.
-	Cache cache.Interface[[]unstructured.Unstructured]
+	// CacheOptions holds cache configuration. nil = caching disabled.
+	CacheOptions *cache.Options
 
 	// SourceAnnotations enables automatic addition of source tracking annotations.
 	SourceAnnotations bool
-
-	// CacheKeyFunc customizes how cache keys are generated from template specifications.
-	// If nil, DefaultCacheKey is used.
-	CacheKeyFunc CacheKeyFunc
 }
 
 // ApplyTo applies the renderer options to the target configuration.
@@ -35,15 +29,14 @@ func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 	target.Filters = opts.Filters
 	target.Transformers = opts.Transformers
 
-	if opts.Cache != nil {
-		target.Cache = opts.Cache
+	if opts.CacheOptions != nil {
+		if target.CacheOptions == nil {
+			target.CacheOptions = &cache.Options{}
+		}
+		opts.CacheOptions.ApplyTo(target.CacheOptions)
 	}
 
 	target.SourceAnnotations = opts.SourceAnnotations
-
-	if opts.CacheKeyFunc != nil {
-		target.CacheKeyFunc = opts.CacheKeyFunc
-	}
 }
 
 // WithFilter adds a renderer-specific filter to this GoTemplate renderer's processing chain.
@@ -69,7 +62,13 @@ func WithTransformer(t types.Transformer) RendererOption {
 // By default, caching is NOT enabled.
 func WithCache(opts ...cache.Option) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(rendererOpts *RendererOptions) {
-		rendererOpts.Cache = cache.NewRenderCache(opts...)
+		if rendererOpts.CacheOptions == nil {
+			rendererOpts.CacheOptions = &cache.Options{}
+		}
+
+		for _, opt := range opts {
+			opt.ApplyTo(rendererOpts.CacheOptions)
+		}
 	})
 }
 
@@ -80,17 +79,5 @@ func WithCache(opts ...cache.Option) RendererOption {
 func WithSourceAnnotations(enabled bool) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceAnnotations = enabled
-	})
-}
-
-// WithCacheKeyFunc sets a custom cache key generation function.
-// Built-in options: DefaultCacheKey (default), FastCacheKey, PathOnlyCacheKey.
-//
-// Example:
-//
-//	gotemplate.WithCacheKeyFunc(gotemplate.FastCacheKey())
-func WithCacheKeyFunc(fn CacheKeyFunc) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
-		opts.CacheKeyFunc = fn
 	})
 }

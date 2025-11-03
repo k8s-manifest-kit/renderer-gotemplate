@@ -10,6 +10,7 @@ import (
 	"github.com/k8s-manifest-kit/engine/pkg/pipeline"
 	"github.com/k8s-manifest-kit/engine/pkg/types"
 	"github.com/k8s-manifest-kit/pkg/util"
+	"github.com/k8s-manifest-kit/pkg/util/cache"
 	"github.com/k8s-manifest-kit/pkg/util/k8s"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,6 +43,7 @@ type Source struct {
 type Renderer struct {
 	inputs []*sourceHolder
 	opts   RendererOptions
+	cache  cache.Interface[[]unstructured.Unstructured]
 }
 
 // New creates a new GoTemplate Renderer with the given inputs and options.
@@ -53,11 +55,6 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 
 	for _, opt := range opts {
 		opt.ApplyTo(&rendererOpts)
-	}
-
-	// Set default cache key function if not provided
-	if rendererOpts.CacheKeyFunc == nil {
-		rendererOpts.CacheKeyFunc = DefaultCacheKey()
 	}
 
 	// Wrap sources in holders and validate
@@ -75,6 +72,7 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 	r := &Renderer{
 		inputs: holders,
 		opts:   rendererOpts,
+		cache:  newCache(rendererOpts.CacheOptions),
 	}
 
 	return r, nil
@@ -158,19 +156,17 @@ func (r *Renderer) renderSingle(
 		)
 	}
 
-	var cacheKey string
+	spec := TemplateSpec{
+		Path:   holder.Path,
+		Values: values,
+	}
 
 	// Check cache (if enabled)
-	if r.opts.Cache != nil {
-		cacheKey = r.opts.CacheKeyFunc(TemplateSpec{
-			Path:   holder.Path,
-			Values: values,
-		})
-
+	if r.cache != nil {
 		// ensure objects are evicted
-		r.opts.Cache.Sync()
+		r.cache.Sync()
 
-		if cached, found := r.opts.Cache.Get(cacheKey); found {
+		if cached, found := r.cache.Get(spec); found {
 			return cached, nil
 		}
 	}
@@ -224,8 +220,8 @@ func (r *Renderer) renderSingle(
 	}
 
 	// Cache result (if enabled)
-	if r.opts.Cache != nil {
-		r.opts.Cache.Set(cacheKey, result)
+	if r.cache != nil {
+		r.cache.Set(spec, result)
 	}
 
 	return result, nil

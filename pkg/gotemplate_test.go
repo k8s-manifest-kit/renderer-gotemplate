@@ -8,6 +8,7 @@ import (
 	"github.com/k8s-manifest-kit/engine/pkg/filter/meta/gvk"
 	"github.com/k8s-manifest-kit/engine/pkg/transformer/meta/labels"
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
+	"github.com/k8s-manifest-kit/pkg/util/cache"
 	jqmatcher "github.com/lburgazzoli/gomega-matchers/pkg/matchers/jq"
 	"github.com/onsi/gomega/types"
 	"github.com/rs/xid"
@@ -456,8 +457,15 @@ func TestCacheIntegration(t *testing.T) {
 				}),
 			},
 		},
-			gotemplate.WithCache(),
-			gotemplate.WithCacheKeyFunc(gotemplate.FastCacheKey()),
+			gotemplate.WithCache(
+				cache.WithKeyFunc(func(key any) string {
+					if spec, ok := key.(gotemplate.TemplateSpec); ok {
+						return spec.Path
+					}
+
+					return cache.DefaultKeyFunc(key)
+				}),
+			),
 		)
 		g.Expect(err).ToNot(HaveOccurred())
 
