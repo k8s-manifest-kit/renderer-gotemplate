@@ -438,6 +438,49 @@ func TestCacheIntegration(t *testing.T) {
 			g.Expect(result2[0].GetName()).ToNot(Equal("modified-name"))
 		}
 	})
+
+	t.Run("should use custom cache key function", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Use FastCacheKey which ignores values
+		renderer, err := gotemplate.New([]gotemplate.Source{
+			{
+				FS: fstest.MapFS{
+					"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+				},
+				Path: "templates/*.tpl",
+				Values: gotemplate.Values(map[string]any{
+					"Repo":      "custom-key-test",
+					"Component": "frontend",
+					"Port":      8080,
+				}),
+			},
+		},
+			gotemplate.WithCache(),
+			gotemplate.WithCacheKeyFunc(gotemplate.FastCacheKey()),
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render - cache miss
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).To(HaveLen(1))
+
+		// Second render with DIFFERENT values but using FastCacheKey
+		// ignores values, so this should be a cache hit
+		result2, err := renderer.Process(t.Context(), map[string]any{
+			"Repo":      "different-app",
+			"Component": "backend",
+			"Port":      9090,
+		})
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).To(HaveLen(len(result1)))
+
+		// Results should be identical despite different values (cache hit)
+		for i := range result1 {
+			g.Expect(result2[i]).To(Equal(result1[i]))
+		}
+	})
 }
 
 func BenchmarkGoTemplateRenderWithoutCache(b *testing.B) {

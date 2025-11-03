@@ -13,7 +13,6 @@ import (
 	"github.com/k8s-manifest-kit/pkg/util/k8s"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 const rendererType = "gotemplate"
@@ -54,6 +53,11 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 
 	for _, opt := range opts {
 		opt.ApplyTo(&rendererOpts)
+	}
+
+	// Set default cache key function if not provided
+	if rendererOpts.CacheKeyFunc == nil {
+		rendererOpts.CacheKeyFunc = DefaultCacheKey()
 	}
 
 	// Wrap sources in holders and validate
@@ -154,17 +158,11 @@ func (r *Renderer) renderSingle(
 		)
 	}
 
-	// Compute cache key from template path and values
-	type cacheKeyData struct {
-		Path   string
-		Values any
-	}
-
 	var cacheKey string
 
 	// Check cache (if enabled)
 	if r.opts.Cache != nil {
-		cacheKey = dump.ForHash(cacheKeyData{
+		cacheKey = r.opts.CacheKeyFunc(TemplateSpec{
 			Path:   holder.Path,
 			Values: values,
 		})

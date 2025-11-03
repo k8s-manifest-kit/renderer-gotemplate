@@ -24,6 +24,10 @@ type RendererOptions struct {
 
 	// SourceAnnotations enables automatic addition of source tracking annotations.
 	SourceAnnotations bool
+
+	// CacheKeyFunc customizes how cache keys are generated from template specifications.
+	// If nil, DefaultCacheKey is used.
+	CacheKeyFunc CacheKeyFunc
 }
 
 // ApplyTo applies the renderer options to the target configuration.
@@ -36,6 +40,10 @@ func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 	}
 
 	target.SourceAnnotations = opts.SourceAnnotations
+
+	if opts.CacheKeyFunc != nil {
+		target.CacheKeyFunc = opts.CacheKeyFunc
+	}
 }
 
 // WithFilter adds a renderer-specific filter to this GoTemplate renderer's processing chain.
@@ -72,5 +80,17 @@ func WithCache(opts ...cache.Option) RendererOption {
 func WithSourceAnnotations(enabled bool) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceAnnotations = enabled
+	})
+}
+
+// WithCacheKeyFunc sets a custom cache key generation function.
+// Built-in options: DefaultCacheKey (default), FastCacheKey, PathOnlyCacheKey.
+//
+// Example:
+//
+//	gotemplate.WithCacheKeyFunc(gotemplate.FastCacheKey())
+func WithCacheKeyFunc(fn CacheKeyFunc) RendererOption {
+	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+		opts.CacheKeyFunc = fn
 	})
 }
