@@ -16,7 +16,7 @@ The GoTemplate renderer provides a way to generate Kubernetes manifests from Go 
 - **TTL-based caching** with automatic deep cloning
 - **Renderer-level filters and transformers**
 - **Source annotations** for tracking template origin
-- **Thread-safe concurrent rendering**
+- **Thread-safe rendering**
 
 ## 3. Core Concepts
 
