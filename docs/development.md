@@ -410,8 +410,8 @@ func (s *sourceHolder) LoadTemplates() (*template.Template, error) {
 
 **Deep Value Merging:**
 ```go
-// Use util.DeepMerge for combining source and render-time values
-mergedValues := util.DeepMerge(sourceValues, renderTimeValues)
+// Use maps.DeepMerge for combining source and render-time values
+mergedValues := maps.DeepMerge(sourceValues, renderTimeValues)
 ```
 
 **Cache Key Computation:**

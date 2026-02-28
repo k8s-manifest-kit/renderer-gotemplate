@@ -7,14 +7,15 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/k8s-manifest-kit/engine/pkg/types"
 	utilerrors "github.com/k8s-manifest-kit/pkg/util/errors"
 )
 
 // Values returns a Values function that always returns the provided static values.
 // This is a convenience helper for the common case of non-dynamic values.
-func Values(values map[string]any) func(context.Context) (map[string]any, error) {
-	return func(_ context.Context) (map[string]any, error) {
-		return values, nil
+func Values(values map[string]any) func(context.Context) (types.Values, error) {
+	return func(_ context.Context) (types.Values, error) {
+		return types.Values(values), nil
 	}
 }
 

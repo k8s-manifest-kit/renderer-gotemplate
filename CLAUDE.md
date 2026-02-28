@@ -242,7 +242,7 @@ Cache entries:
 
 ### Value Merging
 
-Uses `util.DeepMerge()` for combining maps:
+Uses `maps.DeepMerge()` for combining maps:
 - Recursively merges nested maps
 - Render-time values override source values
 - Non-map values replaced entirely
@@ -365,7 +365,7 @@ func (s *sourceHolder) LoadTemplates() (*template.Template, error) {
 ```go
 // Deep merge source and render-time values
 sourceValues := map[string]any{/* from source.Values() */}
-mergedValues := util.DeepMerge(sourceValues, renderTimeValues)
+mergedValues := maps.DeepMerge(sourceValues, renderTimeValues)
 ```
 
 ### Cache Key Generation

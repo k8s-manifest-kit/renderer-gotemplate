@@ -9,9 +9,9 @@ import (
 
 	"github.com/k8s-manifest-kit/engine/pkg/pipeline"
 	"github.com/k8s-manifest-kit/engine/pkg/types"
-	"github.com/k8s-manifest-kit/pkg/util"
 	"github.com/k8s-manifest-kit/pkg/util/cache"
 	"github.com/k8s-manifest-kit/pkg/util/k8s"
+	"github.com/k8s-manifest-kit/pkg/util/maps"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -31,7 +31,11 @@ type Source struct {
 	// Values provides data to be substituted into templates during rendering.
 	// Function is called during rendering to obtain dynamic values.
 	// Accessible within templates via dot notation (e.g., {{ .FieldName }}).
-	Values func(context.Context) (map[string]any, error)
+	Values func(context.Context) (types.Values, error)
+
+	// PostRenderers are source-specific post-renderers applied to this source's output
+	// before combining with other sources.
+	PostRenderers []types.PostRenderer
 }
 
 // Renderer handles Go template rendering operations.
@@ -81,29 +85,42 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 
 // Process executes the rendering logic for all configured inputs.
 // This method is safe for concurrent use.
-func (r *Renderer) Process(ctx context.Context, renderTimeValues map[string]any) ([]unstructured.Unstructured, error) {
+func (r *Renderer) Process(ctx context.Context, renderTimeValues types.Values) ([]unstructured.Unstructured, error) {
 	allObjects := make([]unstructured.Unstructured, 0)
 
 	for i := range r.inputs {
-		objects, err := r.renderSingle(ctx, r.inputs[i], renderTimeValues)
+		selected, err := pipeline.ApplySourceSelectors(ctx, r.inputs[i].Source, r.opts.SourceSelectors)
+		if err != nil {
+			return nil, fmt.Errorf("source selector error for gotemplate pattern %s: %w", r.inputs[i].Path, err)
+		}
+
+		if !selected {
+			continue
+		}
+
+		sValues := renderTimeValues.DeepClone()
+
+		objects, err := r.renderSingle(ctx, r.inputs[i], sValues)
 		if err != nil {
 			return nil, fmt.Errorf("error rendering gotemplate pattern %s: %w", r.inputs[i].Path, err)
 		}
 
-		// Apply renderer-level filters and transformers per-source for better error context
-		transformed, err := pipeline.Apply(ctx, objects, r.opts.Filters, r.opts.Transformers)
+		objects, err = pipeline.ApplyPostRenderers(ctx, objects, r.inputs[i].PostRenderers)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"error applying filters/transformers to gotemplate pattern %s: %w",
-				r.inputs[i].Path,
-				err,
-			)
+			return nil, fmt.Errorf("source post-renderer error for gotemplate pattern %s: %w", r.inputs[i].Path, err)
 		}
 
-		allObjects = append(allObjects, transformed...)
+		allObjects = append(allObjects, objects...)
 	}
 
-	return allObjects, nil
+	chain := types.BuildPostRendererChain(r.opts.Filters, r.opts.Transformers, r.opts.PostRenderers)
+
+	result, err := pipeline.ApplyPostRenderers(ctx, allObjects, chain)
+	if err != nil {
+		return nil, fmt.Errorf("renderer post-renderer error: %w", err)
+	}
+
+	return result, nil
 }
 
 // Name returns the renderer type identifier.
@@ -114,9 +131,9 @@ func (r *Renderer) Name() string {
 func (r *Renderer) values(
 	ctx context.Context,
 	holder *sourceHolder,
-	renderTimeValues map[string]any,
-) (map[string]any, error) {
-	sourceValues := map[string]any{}
+	renderTimeValues types.Values,
+) (types.Values, error) {
+	sourceValues := types.Values{}
 
 	if holder.Values != nil {
 		v, err := holder.Values(ctx)
@@ -128,18 +145,19 @@ func (r *Renderer) values(
 			)
 		}
 
-		sourceValues = v
+		if v != nil {
+			sourceValues = v
+		}
 	}
 
-	// Deep merge with render-time values taking precedence
-	return util.DeepMerge(sourceValues, renderTimeValues), nil
+	return types.Values(maps.DeepMerge(map[string]any(sourceValues), map[string]any(renderTimeValues))), nil
 }
 
 // renderSingle performs the rendering for a single template input.
 func (r *Renderer) renderSingle(
 	ctx context.Context,
 	holder *sourceHolder,
-	renderTimeValues map[string]any,
+	renderTimeValues types.Values,
 ) ([]unstructured.Unstructured, error) {
 	// Parse templates if not already parsed (thread-safe lazy loading)
 	templates, err := holder.LoadTemplates()

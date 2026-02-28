@@ -337,10 +337,10 @@ func TestCacheIntegration(t *testing.T) {
 	t.Run("should miss cache on different values", func(t *testing.T) {
 		g := NewWithT(t)
 		callCount := 0
-		dynamicValues := func(_ context.Context) (map[string]any, error) {
+		dynamicValues := func(_ context.Context) (pkgtypes.Values, error) {
 			callCount++
 
-			return map[string]any{
+			return pkgtypes.Values{
 				"Repo":      xid.New().String(),
 				"Component": "frontend",
 			}, nil
@@ -563,8 +563,8 @@ func BenchmarkGoTemplateRenderCacheMiss(b *testing.B) {
 					"templates/configmap.yaml.tpl": &fstest.MapFile{Data: []byte(configMapTemplate)},
 				},
 				Path: "templates/*.tpl",
-				Values: func(_ context.Context) (map[string]any, error) {
-					return map[string]any{
+				Values: func(_ context.Context) (pkgtypes.Values, error) {
+					return pkgtypes.Values{
 						"Repo":      xid.New().String(),
 						"Component": "backend",
 						"Port":      8080,
@@ -997,10 +997,10 @@ func TestContentHash(t *testing.T) {
 		}
 
 		callCount := 0
-		dynamicValues := func(_ context.Context) (map[string]any, error) {
+		dynamicValues := func(_ context.Context) (pkgtypes.Values, error) {
 			callCount++
 
-			return map[string]any{
+			return pkgtypes.Values{
 				"Repo":      xid.New().String(),
 				"Component": "frontend",
 			}, nil
