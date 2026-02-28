@@ -51,6 +51,7 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 	rendererOpts := RendererOptions{
 		Filters:      make([]types.Filter, 0),
 		Transformers: make([]types.Transformer, 0),
+		ContentHash:  true,
 	}
 
 	for _, opt := range opts {
@@ -200,21 +201,7 @@ func (r *Renderer) renderSingle(
 			return nil, fmt.Errorf("failed to decode YAML from template %s: %w", t.Name(), err)
 		}
 
-		// Add source annotations if enabled
-		if r.opts.SourceAnnotations {
-			for i := range objs {
-				annotations := objs[i].GetAnnotations()
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
-
-				annotations[types.AnnotationSourceType] = rendererType
-				annotations[types.AnnotationSourcePath] = holder.Path
-				annotations[types.AnnotationSourceFile] = t.Name()
-
-				objs[i].SetAnnotations(annotations)
-			}
-		}
+		r.annotateObjects(objs, holder.Path, t.Name())
 
 		result = append(result, objs...)
 	}
@@ -225,4 +212,32 @@ func (r *Renderer) renderSingle(
 	}
 
 	return result, nil
+}
+
+// annotateObjects adds source annotations and content hash to decoded objects.
+func (r *Renderer) annotateObjects(
+	objs []unstructured.Unstructured,
+	path string,
+	fileName string,
+) {
+	if r.opts.SourceAnnotations {
+		for i := range objs {
+			annotations := objs[i].GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+
+			annotations[types.AnnotationSourceType] = rendererType
+			annotations[types.AnnotationSourcePath] = path
+			annotations[types.AnnotationSourceFile] = fileName
+
+			objs[i].SetAnnotations(annotations)
+		}
+	}
+
+	if r.opts.ContentHash {
+		for i := range objs {
+			types.SetContentHash(&objs[i])
+		}
+	}
 }

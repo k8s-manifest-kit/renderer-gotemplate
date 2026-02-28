@@ -22,6 +22,10 @@ type RendererOptions struct {
 
 	// SourceAnnotations enables automatic addition of source tracking annotations.
 	SourceAnnotations bool
+
+	// ContentHash enables automatic addition of a SHA-256 content hash annotation.
+	// Default: true (enabled).
+	ContentHash bool
 }
 
 // ApplyTo applies the renderer options to the target configuration.
@@ -37,6 +41,7 @@ func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 	}
 
 	target.SourceAnnotations = opts.SourceAnnotations
+	target.ContentHash = opts.ContentHash
 }
 
 // WithFilter adds a renderer-specific filter to this GoTemplate renderer's processing chain.
@@ -79,5 +84,14 @@ func WithCache(opts ...cache.Option) RendererOption {
 func WithSourceAnnotations(enabled bool) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceAnnotations = enabled
+	})
+}
+
+// WithContentHash enables or disables automatic addition of a SHA-256 content hash annotation.
+// When enabled, each rendered resource gets an annotation with a hash of its content.
+// Default: true (enabled).
+func WithContentHash(enabled bool) RendererOption {
+	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+		opts.ContentHash = enabled
 	})
 }
