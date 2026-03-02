@@ -10,9 +10,9 @@ The **GoTemplate Renderer** component of k8s-manifest-kit renders Kubernetes man
 
 ## Documentation
 
-- **[README.md](README.md)** - Module overview and quick start
-- **[docs/design.md](docs/design.md)** - Template rendering architecture and design decisions
-- **[docs/development.md](docs/development.md)** - Coding conventions, testing guidelines, and contribution guide
+- **@README.md** - Module overview and quick start
+- **@docs/design.md** - Template rendering architecture and design decisions
+- **@docs/development.md** - Coding conventions, testing guidelines, and contribution guide
 
 ## Quick Reference
 
@@ -155,11 +155,11 @@ go test -v ./pkg -run=^$ -bench=.
 ```
 
 For detailed development information:
-- **Build commands**: See [docs/development.md#setup-and-build](docs/development.md#setup-and-build)
-- **Coding conventions**: See [docs/development.md#coding-conventions](docs/development.md#coding-conventions)
-- **Testing guidelines**: See [docs/development.md#testing-guidelines](docs/development.md#testing-guidelines)
-- **Adding features**: See [docs/development.md#adding-features](docs/development.md#adding-features)
-- **Code review guidelines**: See [docs/development.md#code-review-guidelines](docs/development.md#code-review-guidelines)
+- **Build commands**: See @docs/development.md (Setup and Build)
+- **Coding conventions**: See @docs/development.md (Coding Conventions)
+- **Testing guidelines**: See @docs/development.md (Testing Guidelines)
+- **Adding features**: See @docs/development.md (Adding Features)
+- **Code review guidelines**: See @docs/development.md (Code Review Guidelines)
 
 ## Testing Conventions
 
@@ -389,6 +389,6 @@ cacheKey := dump.ForHash(cacheKeyData{
 ## Questions or Issues?
 
 - Open an issue in the [renderer-gotemplate repository](https://github.com/k8s-manifest-kit/renderer-gotemplate)
-- Refer to [docs/design.md](docs/design.md) for architecture details
+- Refer to @docs/design.md for architecture details
 - Check the [k8s-manifest-kit organization](https://github.com/k8s-manifest-kit) for related components
 
