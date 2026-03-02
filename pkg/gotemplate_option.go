@@ -21,7 +21,7 @@ type RendererOptions struct {
 	PostRenderers []types.PostRenderer
 
 	// SourceSelectors are renderer-specific source selectors evaluated before rendering each source.
-	SourceSelectors []types.SourceSelector
+	SourceSelectors []SourceSelector
 
 	// CacheOptions holds cache configuration. nil = caching disabled.
 	CacheOptions *cache.Options
@@ -74,8 +74,9 @@ func WithPostRenderer(p types.PostRenderer) RendererOption {
 }
 
 // WithSourceSelector adds a source selector to this GoTemplate renderer.
-// Use source.Selector[gotemplate.Source] to build type-safe selectors.
-func WithSourceSelector(s types.SourceSelector) RendererOption {
+// Source selectors are evaluated before rendering each source. If any selector
+// returns false, the source is skipped entirely.
+func WithSourceSelector(s SourceSelector) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceSelectors = append(opts.SourceSelectors, s)
 	})
