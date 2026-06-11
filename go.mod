@@ -3,7 +3,7 @@ module github.com/k8s-manifest-kit/renderer-gotemplate
 go 1.25.11
 
 require (
-	github.com/k8s-manifest-kit/engine v0.2.1-0.20260604145727-e259f45699d3
+	github.com/k8s-manifest-kit/engine v0.2.1-0.20260611122437-2eac20bfa748
 	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260604145543-c4a39bd14f36
 	github.com/lburgazzoli/gomega-matchers v0.4.1-0.20260219145423-4061a5fb8799
 	github.com/onsi/gomega v1.41.0
