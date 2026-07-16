@@ -269,7 +269,27 @@ func BenchmarkGoTemplateRenderWithCache(b *testing.B) {
 
 ### Adding Template Functions
 
-To add custom template functions:
+The package exposes an opt-in renderer-level registration API:
+
+```go
+renderer, err := gotemplate.New(
+    sources,
+    gotemplate.WithFunc("upper", strings.ToUpper),
+    gotemplate.WithFuncs(template.FuncMap{
+        "toYAML":  gotemplate.ToYAML,
+        "indent":  gotemplate.Indent,
+        "nindent": gotemplate.Nindent,
+    }),
+)
+```
+
+`text/template` does not provide `toYAML`, `indent`, or `nindent` out of the
+box. This package exposes `ToYAML`, `Indent`, and `Nindent` as convenience
+helpers, but does not register them automatically. If callers want the broader
+Sprig function surface, they can register Sprig's function map through
+`WithFuncs(...)`.
+
+To add or extend template function support:
 
 1. Create a function map in `gotemplate_support.go`
 2. Apply during template parsing

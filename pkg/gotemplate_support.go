@@ -2,6 +2,7 @@ package gotemplate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"github.com/k8s-manifest-kit/engine/pkg/types"
 	utilerrors "github.com/k8s-manifest-kit/pkg/util/errors"
 )
+
+var errInvalidTemplateFuncMap = errors.New("invalid template function map")
 
 // Values returns a Values function that always returns the provided static values.
 // This is a convenience helper for the common case of non-dynamic values.
@@ -25,6 +28,9 @@ type sourceHolder struct {
 
 	// Mutex protects concurrent access to templates field
 	mu *sync.RWMutex
+
+	// Template functions registered at the renderer level.
+	funcs template.FuncMap
 
 	// Parsed templates (lazy-loaded on first Process call, protected by mu)
 	templates *template.Template
@@ -52,7 +58,13 @@ func (h *sourceHolder) LoadTemplates() (*template.Template, error) {
 		return h.templates, nil
 	}
 
-	tmpl, err := template.ParseFS(h.FS, h.Path)
+	tmpl := template.New("")
+
+	if err := addTemplateFuncs(tmpl, h.funcs); err != nil {
+		return nil, fmt.Errorf("failed to register template functions (path: %s): %w", h.Path, err)
+	}
+
+	tmpl, err := tmpl.ParseFS(h.FS, h.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates (path: %s): %w", h.Path, err)
 	}
@@ -62,4 +74,20 @@ func (h *sourceHolder) LoadTemplates() (*template.Template, error) {
 	h.templates = tmpl.Option("missingkey=error")
 
 	return h.templates, nil
+}
+
+func addTemplateFuncs(tmpl *template.Template, funcs template.FuncMap) (err error) {
+	if len(funcs) == 0 {
+		return nil
+	}
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("%w: %v", errInvalidTemplateFuncMap, recovered)
+		}
+	}()
+
+	tmpl.Funcs(funcs)
+
+	return nil
 }

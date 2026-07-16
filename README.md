@@ -18,6 +18,37 @@ go get github.com/k8s-manifest-kit/renderer-gotemplate
 
 See the main [docs repository](https://github.com/k8s-manifest-kit/docs) for comprehensive documentation.
 
+## Template Functions
+
+Custom template functions can be registered per renderer using functional options.
+The package also exposes a small set of convenience helpers that callers can opt
+into explicitly:
+
+- `ToYAML`
+- `Indent`
+- `Nindent`
+
+These helpers are **not** registered by default. If you want the broader
+Sprig helper set, register Sprig's function map explicitly through
+`WithFuncs(...)`.
+
+```go
+renderer, err := gotemplate.New(
+    []gotemplate.Source{
+        {
+            FS:   os.DirFS("./templates"),
+            Path: "*.yaml.tpl",
+        },
+    },
+    gotemplate.WithFunc("upper", strings.ToUpper),
+    gotemplate.WithFuncs(template.FuncMap{
+        "toYAML":  gotemplate.ToYAML,
+        "indent":  gotemplate.Indent,
+        "nindent": gotemplate.Nindent,
+    }),
+)
+```
+
 ## Contributing
 
 Contributions are welcome! Please see our [contributing guidelines](https://github.com/k8s-manifest-kit/docs/blob/main/CONTRIBUTING.md).

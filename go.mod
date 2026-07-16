@@ -3,13 +3,14 @@ module github.com/k8s-manifest-kit/renderer-gotemplate
 go 1.26.5
 
 require (
-	github.com/k8s-manifest-kit/engine v0.2.1-0.20260716102005-4a2cfd776d5e
-	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260716101450-07246d3906c2
+	github.com/k8s-manifest-kit/engine v0.2.1-0.20260716110219-fb67c5bea55e
+	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260716110029-cb840211b914
 	github.com/lburgazzoli/gomega-matchers v0.4.1-0.20260219145423-4061a5fb8799
 	github.com/onsi/gomega v1.42.1
 	github.com/rs/xid v1.6.0
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	stdmaps "maps"
 	"sync"
 
 	"github.com/k8s-manifest-kit/engine/pkg/pipeline"
@@ -73,6 +74,7 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 		holders[i] = &sourceHolder{
 			Source: inputs[i],
 			mu:     &sync.RWMutex{},
+			funcs:  stdmaps.Clone(rendererOpts.Funcs),
 		}
 		if err := holders[i].Validate(); err != nil {
 			return nil, fmt.Errorf("validation failed for source with path %q: %w", inputs[i].Path, err)

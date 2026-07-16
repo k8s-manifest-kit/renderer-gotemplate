@@ -1,6 +1,9 @@
 package gotemplate
 
 import (
+	"maps"
+	"text/template"
+
 	"github.com/k8s-manifest-kit/engine/pkg/types"
 	"github.com/k8s-manifest-kit/pkg/util"
 	"github.com/k8s-manifest-kit/pkg/util/cache"
@@ -32,6 +35,9 @@ type RendererOptions struct {
 	// ContentHash enables automatic addition of a SHA-256 content hash annotation.
 	// Default: true (enabled).
 	ContentHash bool
+
+	// Funcs are renderer-level template functions available to all sources.
+	Funcs template.FuncMap
 }
 
 // ApplyTo applies the renderer options to the target configuration.
@@ -50,6 +56,14 @@ func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 
 	target.SourceAnnotations = opts.SourceAnnotations
 	target.ContentHash = opts.ContentHash
+
+	if len(opts.Funcs) > 0 {
+		if target.Funcs == nil {
+			target.Funcs = make(template.FuncMap, len(opts.Funcs))
+		}
+
+		maps.Copy(target.Funcs, opts.Funcs)
+	}
 }
 
 // WithFilter adds a renderer-specific filter to this GoTemplate renderer's processing chain.
@@ -106,5 +120,27 @@ func WithSourceAnnotations(enabled bool) RendererOption {
 func WithContentHash(enabled bool) RendererOption {
 	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.ContentHash = enabled
+	})
+}
+
+// WithFunc adds a renderer-level template function available to all sources.
+func WithFunc(name string, fn any) RendererOption {
+	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+		if opts.Funcs == nil {
+			opts.Funcs = template.FuncMap{}
+		}
+
+		opts.Funcs[name] = fn
+	})
+}
+
+// WithFuncs adds multiple renderer-level template functions available to all sources.
+func WithFuncs(funcs template.FuncMap) RendererOption {
+	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+		if opts.Funcs == nil {
+			opts.Funcs = template.FuncMap{}
+		}
+
+		maps.Copy(opts.Funcs, funcs)
 	})
 }
