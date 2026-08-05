@@ -49,8 +49,18 @@ func (h *sourceHolder) Validate() error {
 }
 
 // LoadTemplates returns parsed templates, loading them lazily if needed.
-// Thread-safe for concurrent use.
+// Thread-safe for concurrent use. Uses a double-checked read lock pattern
+// to avoid write-lock contention on the hot path (templates already parsed).
 func (h *sourceHolder) LoadTemplates() (*template.Template, error) {
+	h.mu.RLock()
+	if h.templates != nil {
+		t := h.templates
+		h.mu.RUnlock()
+
+		return t, nil
+	}
+	h.mu.RUnlock()
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -69,8 +79,6 @@ func (h *sourceHolder) LoadTemplates() (*template.Template, error) {
 		return nil, fmt.Errorf("failed to parse templates (path: %s): %w", h.Path, err)
 	}
 
-	// Set missingkey=error to fail fast when templates reference undefined values
-	// This catches template bugs early rather than silently rendering empty strings
 	h.templates = tmpl.Option("missingkey=error")
 
 	return h.templates, nil
