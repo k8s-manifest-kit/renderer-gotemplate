@@ -6,7 +6,7 @@ require (
 	github.com/k8s-manifest-kit/engine v0.2.1-0.20260805104925-5d87e2dfa509
 	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260805160524-8be7a55dd8b6
 	github.com/lburgazzoli/gomega-matchers v0.4.1-0.20260707174420-9bb480701a57
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/rs/xid v1.6.0
 	k8s.io/api v0.36.3
 	k8s.io/apimachinery v0.36.3
