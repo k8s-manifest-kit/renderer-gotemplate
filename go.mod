@@ -1,15 +1,15 @@
 module github.com/k8s-manifest-kit/renderer-gotemplate
 
-go 1.26.5
+go 1.26.8
 
 require (
-	github.com/k8s-manifest-kit/engine v0.2.1-0.20260805104925-5d87e2dfa509
-	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260805160524-8be7a55dd8b6
-	github.com/lburgazzoli/gomega-matchers v0.4.1-0.20260707174420-9bb480701a57
-	github.com/onsi/gomega v1.42.1
+	github.com/k8s-manifest-kit/engine v0.2.1-0.20260903085614-a9bf18406cf5
+	github.com/k8s-manifest-kit/pkg v0.2.1-0.20260903085308-d066891ccc4b
+	github.com/lburgazzoli/gomega-matchers v0.6.0
+	github.com/onsi/gomega v1.43.0
 	github.com/rs/xid v1.6.0
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -25,9 +25,9 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
