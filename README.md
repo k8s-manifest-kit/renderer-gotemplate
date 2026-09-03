@@ -1,12 +1,9 @@
-# renderer-gotemplate
+# Go Template Renderer
 
-Go template renderer for Kubernetes manifests
-
-Part of the [k8s-manifest-kit](https://github.com/k8s-manifest-kit) organization.
-
-## Status
-
-🚧 **Under Development** - This repository is being set up.
+`renderer-gotemplate` renders Kubernetes manifests from Go `text/template`
+files stored in an `io/fs` filesystem. It supports static or dynamic values,
+optional template functions, source selection, post-renderers, content hashes,
+and caching.
 
 ## Installation
 
@@ -14,45 +11,31 @@ Part of the [k8s-manifest-kit](https://github.com/k8s-manifest-kit) organization
 go get github.com/k8s-manifest-kit/renderer-gotemplate
 ```
 
-## Documentation
-
-See the main [docs repository](https://github.com/k8s-manifest-kit/docs) for comprehensive documentation.
-
-## Template Functions
-
-Custom template functions can be registered per renderer using functional options.
-The package also exposes a small set of convenience helpers that callers can opt
-into explicitly:
-
-- `ToYAML`
-- `Indent`
-- `Nindent`
-
-These helpers are **not** registered by default. If you want the broader
-Sprig helper set, register Sprig's function map explicitly through
-`WithFuncs(...)`.
+## Quick start
 
 ```go
-renderer, err := gotemplate.New(
-    []gotemplate.Source{
-        {
-            FS:   os.DirFS("./templates"),
-            Path: "*.yaml.tpl",
-        },
+e, err := gotemplate.NewEngine(gotemplate.Source{
+    FS:   os.DirFS("."),
+    Path: "manifests/*.yaml.tmpl",
+    Values: func(context.Context) (types.Values, error) {
+        return types.Values{"name": "demo"}, nil
     },
-    gotemplate.WithFunc("upper", strings.ToUpper),
-    gotemplate.WithFuncs(template.FuncMap{
-        "toYAML":  gotemplate.ToYAML,
-        "indent":  gotemplate.Indent,
-        "nindent": gotemplate.Nindent,
-    }),
-)
+})
+if err != nil {
+    return err
+}
+
+objects, err := e.Render(ctx)
 ```
 
-## Contributing
+Template helpers such as `ToYAML`, `Indent`, and `Nindent` are opt-in through
+`WithFunc` or `WithFuncs`. Templates use `missingkey=error`; parsing is lazy
+and synchronized. Render-time values are merged with source values according
+to the renderer's documented precedence.
 
-Contributions are welcome! Please see our [contributing guidelines](https://github.com/k8s-manifest-kit/docs/blob/main/CONTRIBUTING.md).
+See [`docs/design.md`](docs/design.md), [`docs/development.md`](docs/development.md),
+and [`AGENTS.md`](AGENTS.md).
 
 ## License
 
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
+Apache License 2.0. See [LICENSE](LICENSE).
