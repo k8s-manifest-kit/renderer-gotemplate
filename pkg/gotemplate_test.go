@@ -469,6 +469,7 @@ func TestCacheIntegration(t *testing.T) {
 			},
 		},
 			gotemplate.WithCache(),
+			gotemplate.WithSourceAnnotations(true),
 		)
 		g.Expect(err).ToNot(HaveOccurred())
 
@@ -476,15 +477,23 @@ func TestCacheIntegration(t *testing.T) {
 		result1, err := renderer.Process(t.Context(), nil)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(result1).ToNot(BeEmpty())
+		for _, obj := range result1 {
+			g.Expect(obj.GetAnnotations()).Should(HaveKeyWithValue(
+				pkgtypes.AnnotationRenderOrigin,
+				pkgtypes.RenderOriginLive,
+			))
+		}
 
-		// Second render - cache hit (should be identical)
+		// Second render - cache hit
 		result2, err := renderer.Process(t.Context(), nil)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(result2).To(HaveLen(len(result1)))
 
-		// Results should be equal
-		for i := range result1 {
-			g.Expect(result2[i]).To(Equal(result1[i]))
+		for _, obj := range result2 {
+			g.Expect(obj.GetAnnotations()).Should(HaveKeyWithValue(
+				pkgtypes.AnnotationRenderOrigin,
+				pkgtypes.RenderOriginCache,
+			))
 		}
 	})
 
@@ -929,6 +938,10 @@ func TestSourceAnnotations(t *testing.T) {
 		for _, obj := range objects {
 			annotations := obj.GetAnnotations()
 			g.Expect(annotations).Should(HaveKeyWithValue(pkgtypes.AnnotationSourceType, "gotemplate"))
+			g.Expect(annotations).Should(HaveKeyWithValue(
+				pkgtypes.AnnotationRenderOrigin,
+				pkgtypes.RenderOriginLive,
+			))
 			g.Expect(annotations).Should(HaveKeyWithValue(pkgtypes.AnnotationSourcePath, "templates/*.tpl"))
 			g.Expect(annotations).Should(HaveKey(pkgtypes.AnnotationSourceFile))
 			// File should be one of the template names (without directory path)
