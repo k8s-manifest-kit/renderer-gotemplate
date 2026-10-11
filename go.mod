@@ -1,6 +1,6 @@
 module github.com/k8s-manifest-kit/renderer-gotemplate
 
-go 1.26.8
+go 1.26.9
 
 require (
 	github.com/k8s-manifest-kit/engine v0.2.1-0.20260917073048-fdd303dbeb9c
@@ -8,8 +8,8 @@ require (
 	github.com/lburgazzoli/gomega-matchers v0.6.1-0.20260902111206-6faf9a4a8c08
 	github.com/onsi/gomega v1.44.0
 	github.com/rs/xid v1.6.0
-	k8s.io/api v0.37.0
-	k8s.io/apimachinery v0.37.0
+	k8s.io/api v0.37.1
+	k8s.io/apimachinery v0.37.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
