@@ -1,6 +1,6 @@
 module github.com/k8s-manifest-kit/renderer-gotemplate
 
-go 1.26.9
+go 1.27.2
 
 require (
 	github.com/k8s-manifest-kit/engine v0.2.1-0.20260917073048-fdd303dbeb9c
