@@ -13,6 +13,9 @@ type TemplateSpec struct {
 }
 
 // newCache creates a cache instance with GoTemplate-specific default KeyFunc.
+// Every call returns an independent cache, so each registered source owns its
+// entries regardless of the configured KeyFunc; key functions only discriminate
+// within a single source.
 func newCache(opts *cache.Options) cache.Interface[[]unstructured.Unstructured] {
 	if opts == nil {
 		return nil

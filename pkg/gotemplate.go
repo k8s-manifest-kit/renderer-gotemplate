@@ -10,7 +10,6 @@ import (
 
 	"github.com/k8s-manifest-kit/engine/pkg/pipeline"
 	"github.com/k8s-manifest-kit/engine/pkg/types"
-	"github.com/k8s-manifest-kit/pkg/util/cache"
 	"github.com/k8s-manifest-kit/pkg/util/k8s"
 	"github.com/k8s-manifest-kit/pkg/util/maps"
 
@@ -50,10 +49,13 @@ type SourceSelector = func(ctx context.Context, source Source) (bool, error)
 // Thread-safety: Renderer is safe for concurrent use. Multiple goroutines
 // may call Process() concurrently on the same Renderer instance. Template parsing
 // is protected by per-Source mutexes to ensure thread-safe lazy initialization.
+//
+// When caching is enabled, each registered Source renders through its own
+// isolated output cache, so sources never share cached results even when
+// their cache keys collide.
 type Renderer struct {
 	inputs []*sourceHolder
 	opts   RendererOptions
-	cache  cache.Interface[[]unstructured.Unstructured]
 }
 
 // New creates a new GoTemplate Renderer with the given inputs and options.
@@ -68,13 +70,15 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 		opt.ApplyTo(&rendererOpts)
 	}
 
-	// Wrap sources in holders and validate
+	// Wrap sources in holders and validate. Each holder owns an isolated output
+	// cache so registered sources can never resolve each other's cached output.
 	holders := make([]*sourceHolder, len(inputs))
 	for i := range inputs {
 		holders[i] = &sourceHolder{
 			Source: inputs[i],
 			mu:     &sync.RWMutex{},
 			funcs:  stdmaps.Clone(rendererOpts.Funcs),
+			cache:  newCache(rendererOpts.CacheOptions),
 		}
 		if err := holders[i].Validate(); err != nil {
 			return nil, fmt.Errorf("validation failed for source with path %q: %w", inputs[i].Path, err)
@@ -84,7 +88,6 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 	r := &Renderer{
 		inputs: holders,
 		opts:   rendererOpts,
-		cache:  newCache(rendererOpts.CacheOptions),
 	}
 
 	return r, nil
@@ -187,12 +190,12 @@ func (r *Renderer) renderSingle(
 		Values: values,
 	}
 
-	// Check cache (if enabled)
-	if r.cache != nil {
+	// Check the source's own cache (if enabled)
+	if holder.cache != nil {
 		// ensure objects are evicted
-		r.cache.Sync()
+		holder.cache.Sync()
 
-		if cached, found := r.cache.Get(spec); found {
+		if cached, found := holder.cache.Get(spec); found {
 			r.addRenderOrigin(cached, types.RenderOriginCache)
 
 			return cached, nil
@@ -233,9 +236,9 @@ func (r *Renderer) renderSingle(
 		result = append(result, objs...)
 	}
 
-	// Cache result (if enabled)
-	if r.cache != nil {
-		r.cache.Set(spec, result)
+	// Cache result in the source's own cache (if enabled)
+	if holder.cache != nil {
+		holder.cache.Set(spec, result)
 	}
 	r.addRenderOrigin(result, types.RenderOriginLive)
 

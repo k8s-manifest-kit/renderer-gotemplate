@@ -9,7 +9,10 @@ import (
 	"text/template"
 
 	"github.com/k8s-manifest-kit/engine/pkg/types"
+	"github.com/k8s-manifest-kit/pkg/util/cache"
 	utilerrors "github.com/k8s-manifest-kit/pkg/util/errors"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var errInvalidTemplateFuncMap = errors.New("invalid template function map")
@@ -32,6 +35,13 @@ type sourceHolder struct {
 	// Template functions registered at the renderer level.
 	funcs template.FuncMap
 
+	// Output cache isolating this source's rendered results from every other
+	// registered source. Entries are keyed by TemplateSpec as before, but they
+	// live in a cache dedicated to this source, so identical keys (same path and
+	// values, or a constant custom key function) can never resolve to another
+	// source's output. nil when caching is disabled.
+	cache cache.Interface[[]unstructured.Unstructured]
+
 	// Parsed templates (lazy-loaded on first Process call, protected by mu)
 	templates *template.Template
 }
@@ -51,6 +61,10 @@ func (h *sourceHolder) Validate() error {
 // LoadTemplates returns parsed templates, loading them lazily if needed.
 // Thread-safe for concurrent use. Uses a double-checked read lock pattern
 // to avoid write-lock contention on the hot path (templates already parsed).
+//
+// Templates are a first-success snapshot: they are parsed once per source and
+// are never refreshed by output-cache expiration or misses. Construct a new
+// renderer to pick up filesystem changes.
 func (h *sourceHolder) LoadTemplates() (*template.Template, error) {
 	h.mu.RLock()
 	if h.templates != nil {
