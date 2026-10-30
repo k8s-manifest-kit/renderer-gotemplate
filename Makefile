@@ -45,6 +45,10 @@ fmt:
 test:
 	go test -v ./...
 
+.PHONY: test/race
+test/race:
+	go test -race -v ./...
+
 .PHONY: bench
 bench:
 	go test -bench=. -benchmem ./... 
