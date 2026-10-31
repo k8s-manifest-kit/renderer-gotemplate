@@ -12,6 +12,11 @@ guarded by synchronization so the same renderer can be used concurrently.
 Only explicitly configured functions are available: use `WithFunc` or
 `WithFuncs` to register helpers such as `ToYAML`, `Indent`, and `Nindent`.
 
+Functions registered with `WithFunc` or `WithFuncs`, source `Values`
+functions, and post-renderers run inside `Process`. The renderer does not
+synchronize this caller-supplied code: it must be safe for concurrent use
+whenever a renderer instance is shared by overlapping calls.
+
 ## Values and pipeline
 
 Source values are resolved for each render and merged with render-time values;

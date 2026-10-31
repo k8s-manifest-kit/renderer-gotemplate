@@ -27,11 +27,16 @@ Run commands from this directory:
 
 ```bash
 make test
+make test/race
 make fmt
 make lint
 make lint/fix
 make check
 ```
 
-Use `testing/fstest.MapFS`, test invalid templates and missing values, preserve error context, and verify concurrent lazy loading when changing template initialization.
+`make check` runs lint and vulncheck; it does not replace `make test` or
+`make test/race`. Tests run offline against `testing/fstest.MapFS`; there is
+no live integration target.
+
+Use `testing/fstest.MapFS`, test invalid templates and missing values, preserve error context, and verify concurrent lazy loading when changing template initialization. Conventions and workflow details are in [Development](docs/development.md).
 
