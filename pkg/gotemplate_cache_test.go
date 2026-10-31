@@ -1,11 +1,14 @@
 package gotemplate_test
 
 import (
+	"context"
 	"testing"
+	"testing/fstest"
 
 	"github.com/k8s-manifest-kit/engine/pkg/transformer/meta/labels"
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
 	"github.com/k8s-manifest-kit/pkg/util/cache"
+	"github.com/rs/xid"
 
 	gotemplate "github.com/k8s-manifest-kit/renderer-gotemplate/pkg"
 
@@ -217,5 +220,207 @@ func TestSourceCacheIsolation(t *testing.T) {
 		g.Expect(configMapSources(miss)).To(Equal(map[string]string{
 			"alpha-dev-config": "alpha",
 		}))
+	})
+}
+
+func TestCacheIntegration(t *testing.T) {
+
+	t.Run("should cache identical renders", func(t *testing.T) {
+		g := NewWithT(t)
+		renderer, err := gotemplate.New([]gotemplate.Source{
+			{
+				FS: fstest.MapFS{
+					"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+				},
+				Path: "templates/*.tpl",
+				Values: gotemplate.Values(map[string]any{
+					"Repo":      "cache-app",
+					"Component": "frontend",
+				}),
+			},
+		},
+			gotemplate.WithCache(),
+			gotemplate.WithSourceAnnotations(true),
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render - cache miss
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).ToNot(BeEmpty())
+		for _, obj := range result1 {
+			g.Expect(obj.GetAnnotations()).Should(HaveKeyWithValue(
+				pkgtypes.AnnotationRenderOrigin,
+				pkgtypes.RenderOriginLive,
+			))
+		}
+
+		// Second render - cache hit
+		result2, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).To(HaveLen(len(result1)))
+
+		for _, obj := range result2 {
+			g.Expect(obj.GetAnnotations()).Should(HaveKeyWithValue(
+				pkgtypes.AnnotationRenderOrigin,
+				pkgtypes.RenderOriginCache,
+			))
+		}
+	})
+
+	t.Run("should miss cache on different values", func(t *testing.T) {
+		g := NewWithT(t)
+		callCount := 0
+		dynamicValues := func(_ context.Context) (pkgtypes.Values, error) {
+			callCount++
+
+			return pkgtypes.Values{
+				"Repo":      xid.New().String(),
+				"Component": "frontend",
+			}, nil
+		}
+
+		renderer, err := gotemplate.New([]gotemplate.Source{
+			{
+				FS: fstest.MapFS{
+					"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+				},
+				Path:   "templates/*.tpl",
+				Values: dynamicValues,
+			},
+		},
+			gotemplate.WithCache(),
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).ToNot(BeEmpty())
+
+		// Second render with different values - cache miss
+		result2, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).ToNot(BeEmpty())
+
+		// Values function should be called twice (no cache hits)
+		g.Expect(callCount).To(Equal(2))
+	})
+
+	t.Run("should work with cache disabled", func(t *testing.T) {
+		g := NewWithT(t)
+		renderer, err := gotemplate.New(
+			[]gotemplate.Source{
+				{
+					FS: fstest.MapFS{
+						"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+					},
+					Path: "templates/*.tpl",
+					Values: gotemplate.Values(map[string]any{
+						"Repo":      "no-cache-app",
+						"Component": "frontend",
+					}),
+				},
+			},
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).ToNot(BeEmpty())
+
+		// Second render - should work even without cache
+		result2, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).To(HaveLen(len(result1)))
+	})
+
+	t.Run("should return clones from cache", func(t *testing.T) {
+		g := NewWithT(t)
+		renderer, err := gotemplate.New([]gotemplate.Source{
+			{
+				FS: fstest.MapFS{
+					"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+				},
+				Path: "templates/*.tpl",
+				Values: gotemplate.Values(map[string]any{
+					"Repo":      "clone-app",
+					"Component": "frontend",
+				}),
+			},
+		},
+			gotemplate.WithCache(),
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).ToNot(BeEmpty())
+
+		// Modify first result
+		if len(result1) > 0 {
+			result1[0].SetName("modified-name")
+		}
+
+		// Second render - should not be affected by modification
+		result2, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).ToNot(BeEmpty())
+
+		if len(result2) > 0 {
+			g.Expect(result2[0].GetName()).ToNot(Equal("modified-name"))
+		}
+	})
+
+	t.Run("should use custom cache key function", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Use FastCacheKey which ignores values
+		renderer, err := gotemplate.New([]gotemplate.Source{
+			{
+				FS: fstest.MapFS{
+					"templates/pod.yaml.tpl": &fstest.MapFile{Data: []byte(podTemplate)},
+				},
+				Path: "templates/*.tpl",
+				Values: gotemplate.Values(map[string]any{
+					"Repo":      "custom-key-test",
+					"Component": "frontend",
+					"Port":      8080,
+				}),
+			},
+		},
+			gotemplate.WithCache(
+				cache.WithKeyFunc(func(key any) string {
+					if spec, ok := key.(gotemplate.TemplateSpec); ok {
+						return spec.Path
+					}
+
+					return cache.DefaultKeyFunc(key)
+				}),
+			),
+		)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// First render - cache miss
+		result1, err := renderer.Process(t.Context(), nil)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result1).To(HaveLen(1))
+
+		// Second render with DIFFERENT values but using FastCacheKey
+		// ignores values, so this should be a cache hit
+		result2, err := renderer.Process(t.Context(), map[string]any{
+			"Repo":      "different-app",
+			"Component": "backend",
+			"Port":      9090,
+		})
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(result2).To(HaveLen(len(result1)))
+
+		// Results should be identical despite different values (cache hit)
+		for i := range result1 {
+			g.Expect(result2[i]).To(Equal(result1[i]))
+		}
 	})
 }

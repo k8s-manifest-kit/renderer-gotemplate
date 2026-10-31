@@ -27,8 +27,9 @@ There is no live integration target: tests run offline against
   `errors.Is` for sentinel checks. Rendering and validation errors should
   name the source path, template, or key needed for diagnosis without
   echoing input contents.
-- Keep shared implementation helpers in `_support.go` files and test-only
-  support in `_support_test.go` files; leave cohesive feature files intact.
+- Keep shared implementation helpers in `_support.go` files and shared
+  test-only helpers in `_support_test.go` files, following the test layout
+  rules below; leave cohesive feature files intact.
 - Format with `make fmt`. The formatter set (gofmt, goimports, gci) and the
   linter configuration in [`.golangci.yml`](../.golangci.yml) define the
   style; do not weaken the configuration to accommodate an implementation
@@ -83,6 +84,31 @@ by the renderer: when a renderer instance is shared by overlapping calls,
 such caller-supplied code must be safe for concurrent use. Register only
 pure functions in concurrency tests.
 
+### Test layout
+
+- Colocate tests with implementation. A `test/` subdirectory is a separate
+  Go package, not a cosmetic folder; use the existing package boundaries.
+- Organize larger suites by concern as `<component>_<concern>_test.go` and
+  retain a cohesive `<component>_test.go` for core API behavior. Files such
+  as `_values_test.go`, `_cache_test.go`, `_metadata_test.go`, and
+  `_concurrency_test.go` are used where those concerns exist; they are not
+  mandatory for every package.
+- Place benchmarks in `<component>_benchmark_test.go` in the same package
+  directory, retaining benchmark names and setup/timing behavior.
+- Put shared test helpers in `<component>_support_test.go` and substantial
+  feature-specific fixture machinery in
+  `<component>_<concern>_support_test.go`. Small test-local helpers and
+  scenario assertions can remain beside their tests.
+- Support files contain helper, fixture, and type declarations — not test,
+  benchmark, fuzz, or example entry points. `_support_test.go` is a naming
+  convention; only `_test.go` has Go's test-file significance.
+- Keep tests discoverable without excessive fragmentation: there is no hard
+  line limit, no one-file-per-test rule, no shared cross-repository harness,
+  no fixture-storage migration, and no automatic test-speed claim.
+- Filenames alone do not change which suite a test runs in: renaming a file
+  does not turn an offline test into a live integration test or exclude it
+  from the offline suite.
+
 ### Regression anchors
 
 - `TestRendererConcurrency` (`pkg/gotemplate_concurrency_test.go`): shared
@@ -93,7 +119,7 @@ pure functions in concurrency tests.
   cache partitioning under equal keys and constant custom key functions,
   reapplication of source post-renderers on cache hits, and the parse-once
   template snapshot.
-- `TestRenderTimeValues` (`pkg/gotemplate_test.go`): render-time values
+- `TestRenderTimeValues` (`pkg/gotemplate_values_test.go`): render-time values
   deep-merge over source values and take precedence.
 
 Template lifetime is distinct from output-cache expiration: cache misses and

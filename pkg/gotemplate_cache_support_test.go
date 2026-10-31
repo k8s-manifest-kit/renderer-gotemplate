@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing/fstest"
 
-	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -40,19 +38,4 @@ func configMapSources(objects []unstructured.Unstructured) map[string]string {
 	}
 
 	return sources
-}
-
-// renderOrigins maps each rendered object name to its render-origin annotation.
-func renderOrigins(objects []unstructured.Unstructured) map[string]string {
-	origins := make(map[string]string, len(objects))
-
-	for _, obj := range objects {
-		origin, _, _ := unstructured.NestedString(
-			obj.Object,
-			"metadata", "annotations", pkgtypes.AnnotationRenderOrigin,
-		)
-		origins[obj.GetName()] = origin
-	}
-
-	return origins
 }
