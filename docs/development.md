@@ -21,6 +21,15 @@ There is no live integration target: tests run offline against
 
 ## Code conventions
 
+- Package layout: `gotemplate.go` holds the source model and renderer,
+  `gotemplate_option.go` the renderer options, `gotemplate_support.go` shared
+  implementation helpers, `gotemplate_functions.go` the opt-in template
+  functions, `gotemplate_cache.go` the output-cache construction, and
+  `engine.go` the `NewEngine` convenience constructor. Renderer options are
+  typed by the shared `github.com/k8s-manifest-kit/pkg/util/option` package.
+  The layout follows the shared
+  [`project-layout.md`](../../docs/project-layout.md) convention (workspace
+  navigation).
 - Give each parameter its own type: `name string, namespace string`, not
   `name, namespace string`.
 - Wrap errors with operation and source context using `%w`, and use

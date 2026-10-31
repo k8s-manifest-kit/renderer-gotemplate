@@ -5,12 +5,12 @@ import (
 	"text/template"
 
 	"github.com/k8s-manifest-kit/engine/pkg/types"
-	"github.com/k8s-manifest-kit/pkg/util"
 	"github.com/k8s-manifest-kit/pkg/util/cache"
+	"github.com/k8s-manifest-kit/pkg/util/option"
 )
 
 // RendererOption is a generic option for RendererOptions.
-type RendererOption = util.Option[RendererOptions]
+type RendererOption = option.Option[RendererOptions]
 
 // RendererOptions is a struct-based option that can set multiple renderer options at once.
 type RendererOptions struct {
@@ -68,21 +68,21 @@ func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 
 // WithFilter adds a renderer-specific filter to this GoTemplate renderer's processing chain.
 func WithFilter(f types.Filter) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.Filters = append(opts.Filters, f)
 	})
 }
 
 // WithTransformer adds a renderer-specific transformer to this GoTemplate renderer's processing chain.
 func WithTransformer(t types.Transformer) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.Transformers = append(opts.Transformers, t)
 	})
 }
 
 // WithPostRenderer adds a renderer-specific post-renderer to this GoTemplate renderer's processing chain.
 func WithPostRenderer(p types.PostRenderer) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.PostRenderers = append(opts.PostRenderers, p)
 	})
 }
@@ -91,14 +91,14 @@ func WithPostRenderer(p types.PostRenderer) RendererOption {
 // Source selectors are evaluated before rendering each source. If any selector
 // returns false, the source is skipped entirely.
 func WithSourceSelector(s SourceSelector) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceSelectors = append(opts.SourceSelectors, s)
 	})
 }
 
 // WithCache enables render result caching with the specified options.
 func WithCache(opts ...cache.Option) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(rendererOpts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(rendererOpts *RendererOptions) {
 		if rendererOpts.CacheOptions == nil {
 			rendererOpts.CacheOptions = &cache.Options{}
 		}
@@ -111,21 +111,21 @@ func WithCache(opts ...cache.Option) RendererOption {
 
 // WithSourceAnnotations enables or disables automatic addition of source tracking annotations.
 func WithSourceAnnotations(enabled bool) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.SourceAnnotations = enabled
 	})
 }
 
 // WithContentHash enables or disables automatic addition of a SHA-256 content hash annotation.
 func WithContentHash(enabled bool) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		opts.ContentHash = enabled
 	})
 }
 
 // WithFunc adds a renderer-level template function available to all sources.
 func WithFunc(name string, fn any) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		if opts.Funcs == nil {
 			opts.Funcs = template.FuncMap{}
 		}
@@ -136,7 +136,7 @@ func WithFunc(name string, fn any) RendererOption {
 
 // WithFuncs adds multiple renderer-level template functions available to all sources.
 func WithFuncs(funcs template.FuncMap) RendererOption {
-	return util.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
+	return option.FunctionalOption[RendererOptions](func(opts *RendererOptions) {
 		if opts.Funcs == nil {
 			opts.Funcs = template.FuncMap{}
 		}
