@@ -24,7 +24,9 @@ There is no live integration target: tests run offline against
 - Package layout: `gotemplate.go` holds the source model and renderer,
   `gotemplate_option.go` the renderer options, `gotemplate_support.go` shared
   implementation helpers, `gotemplate_functions.go` the opt-in template
-  functions, `gotemplate_cache.go` the output-cache construction, and
+  functions, `cache/` the output-cache construction (`cache.New` and
+  `cache.TemplateSpec`, imported from
+  `github.com/k8s-manifest-kit/renderer-gotemplate/pkg/cache`), and
   `engine.go` the `NewEngine` convenience constructor. Renderer options are
   typed by the shared `github.com/k8s-manifest-kit/pkg/util/option` package.
   The layout follows the shared

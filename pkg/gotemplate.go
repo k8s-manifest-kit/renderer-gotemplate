@@ -14,6 +14,8 @@ import (
 	"github.com/k8s-manifest-kit/pkg/util/maps"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/k8s-manifest-kit/renderer-gotemplate/pkg/cache"
 )
 
 const rendererType = "gotemplate"
@@ -78,7 +80,7 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 			Source: inputs[i],
 			mu:     &sync.RWMutex{},
 			funcs:  stdmaps.Clone(rendererOpts.Funcs),
-			cache:  newCache(rendererOpts.CacheOptions),
+			cache:  cache.New(rendererOpts.CacheOptions),
 		}
 		if err := holders[i].Validate(); err != nil {
 			return nil, fmt.Errorf("validation failed for source with path %q: %w", inputs[i].Path, err)
@@ -185,7 +187,7 @@ func (r *Renderer) renderSingle(
 		)
 	}
 
-	spec := TemplateSpec{
+	spec := cache.TemplateSpec{
 		Path:   holder.Path,
 		Values: values,
 	}

@@ -1,7 +1,7 @@
-package gotemplate
+package cache
 
 import (
-	"github.com/k8s-manifest-kit/pkg/util/cache"
+	utilcache "github.com/k8s-manifest-kit/pkg/util/cache"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -12,11 +12,11 @@ type TemplateSpec struct {
 	Values any
 }
 
-// newCache creates a cache instance with GoTemplate-specific default KeyFunc.
+// New creates a cache instance with GoTemplate-specific default KeyFunc.
 // Every call returns an independent cache, so each registered source owns its
 // entries regardless of the configured KeyFunc; key functions only discriminate
 // within a single source.
-func newCache(opts *cache.Options) cache.Interface[[]unstructured.Unstructured] {
+func New(opts *utilcache.Options) utilcache.Interface[[]unstructured.Unstructured] {
 	if opts == nil {
 		return nil
 	}
@@ -25,8 +25,8 @@ func newCache(opts *cache.Options) cache.Interface[[]unstructured.Unstructured] 
 
 	// Inject default KeyFunc for GoTemplate
 	if co.KeyFunc == nil {
-		co.KeyFunc = cache.DefaultKeyFunc
+		co.KeyFunc = utilcache.DefaultKeyFunc
 	}
 
-	return cache.NewRenderCache(co)
+	return utilcache.NewRenderCache(co)
 }

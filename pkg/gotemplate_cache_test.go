@@ -7,10 +7,11 @@ import (
 
 	"github.com/k8s-manifest-kit/engine/pkg/transformer/meta/labels"
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
-	"github.com/k8s-manifest-kit/pkg/util/cache"
+	utilcache "github.com/k8s-manifest-kit/pkg/util/cache"
 	"github.com/rs/xid"
 
 	gotemplate "github.com/k8s-manifest-kit/renderer-gotemplate/pkg"
+	"github.com/k8s-manifest-kit/renderer-gotemplate/pkg/cache"
 
 	. "github.com/onsi/gomega"
 )
@@ -92,7 +93,7 @@ func TestSourceCacheIsolation(t *testing.T) {
 				},
 			},
 			gotemplate.WithCache(
-				cache.WithKeyFunc(func(key any) string {
+				utilcache.WithKeyFunc(func(key any) string {
 					keys = append(keys, key)
 
 					return "constant"
@@ -129,7 +130,7 @@ func TestSourceCacheIsolation(t *testing.T) {
 		// The key function still receives a TemplateSpec for each source.
 		paths := make([]string, 0, len(keys))
 		for _, key := range keys {
-			spec, ok := key.(gotemplate.TemplateSpec)
+			spec, ok := key.(cache.TemplateSpec)
 			g.Expect(ok).To(BeTrue(), "key function should receive a TemplateSpec, got %T", key)
 			paths = append(paths, spec.Path)
 		}
@@ -392,12 +393,12 @@ func TestCacheIntegration(t *testing.T) {
 			},
 		},
 			gotemplate.WithCache(
-				cache.WithKeyFunc(func(key any) string {
-					if spec, ok := key.(gotemplate.TemplateSpec); ok {
+				utilcache.WithKeyFunc(func(key any) string {
+					if spec, ok := key.(cache.TemplateSpec); ok {
 						return spec.Path
 					}
 
-					return cache.DefaultKeyFunc(key)
+					return utilcache.DefaultKeyFunc(key)
 				}),
 			),
 		)
