@@ -34,6 +34,29 @@ There is no live integration target: tests run offline against
   style; do not weaken the configuration to accommodate an implementation
   choice.
 
+### Multiline strings
+
+- Declare every multiline string — fixtures, manifests, templates, and
+  expected output — as one descriptive, standalone, package-level
+  `const name =` declaration with a raw string literal.
+- Never embed multiline string literals in function or method bodies or
+  declare them as function-local constants.
+- Never group multiline constants in `const (...)`. Related single-line
+  scalar constants can still be grouped, and single-line inline strings
+  are unaffected.
+- Keep large literal content separate from execution logic for
+  readability. Preserve meaningful content indentation; the declaration
+  layout must not introduce unintended bytes.
+- A function may format the named template into a local variable: the
+  rule concerns where the literal is declared, not where its string
+  value is used.
+
+```go
+const fixtureYAML = `apiVersion: v1
+kind: ConfigMap
+`
+```
+
 ## Testing
 
 Tests use Gomega with `t.Context()` and live in the external
