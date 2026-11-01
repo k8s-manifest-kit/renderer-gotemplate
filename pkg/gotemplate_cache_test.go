@@ -1,3 +1,8 @@
+// Renderer-level cache behavior: per-source output isolation, cache-hit
+// render origins, and post-renderer reapplication through
+// gotemplate.New and Process. Unit tests of the cache constructor and its
+// key wiring live in pkg/cache.
+
 package gotemplate_test
 
 import (
