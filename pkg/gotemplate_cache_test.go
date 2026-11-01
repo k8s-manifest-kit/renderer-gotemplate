@@ -272,6 +272,23 @@ func TestCacheIntegration(t *testing.T) {
 				pkgtypes.RenderOriginCache,
 			))
 		}
+
+		// A warm hit is origin-only: source fields and the exact hash bytes
+		// stored on the live render are served unchanged.
+		for i := range result1 {
+			g.Expect(result2[i].GetAnnotations()).To(HaveKeyWithValue(
+				pkgtypes.AnnotationSourceType,
+				"gotemplate",
+			))
+			g.Expect(result2[i].GetAnnotations()).To(HaveKeyWithValue(
+				pkgtypes.AnnotationSourcePath,
+				"templates/*.tpl",
+			))
+			g.Expect(result2[i].GetAnnotations()).To(HaveKeyWithValue(
+				pkgtypes.AnnotationContentHash,
+				result1[i].GetAnnotations()[pkgtypes.AnnotationContentHash],
+			))
+		}
 	})
 
 	t.Run("should miss cache on different values", func(t *testing.T) {

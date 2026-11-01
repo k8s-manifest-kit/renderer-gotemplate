@@ -256,9 +256,7 @@ func (r *Renderer) addRenderOrigin(
 		return
 	}
 
-	for i := range objects {
-		types.SetRenderOrigin(&objects[i], origin)
-	}
+	types.AnnotateObjects(objects, types.WithRenderOrigin(origin))
 }
 
 // annotateObjects adds source annotations and content hash to decoded objects.
@@ -267,24 +265,19 @@ func (r *Renderer) annotateObjects(
 	path string,
 	fileName string,
 ) {
+	var opts []types.AnnotationOption
+
 	if r.opts.SourceAnnotations {
-		for i := range objs {
-			annotations := objs[i].GetAnnotations()
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-
-			annotations[types.AnnotationSourceType] = rendererType
-			annotations[types.AnnotationSourcePath] = path
-			annotations[types.AnnotationSourceFile] = fileName
-
-			objs[i].SetAnnotations(annotations)
-		}
+		opts = append(opts, types.WithSourceAnnotations(map[string]string{
+			types.AnnotationSourceType: rendererType,
+			types.AnnotationSourcePath: path,
+			types.AnnotationSourceFile: fileName,
+		}))
 	}
 
 	if r.opts.ContentHash {
-		for i := range objs {
-			types.SetContentHash(&objs[i])
-		}
+		opts = append(opts, types.WithContentHash(true))
 	}
+
+	types.AnnotateObjects(objs, opts...)
 }

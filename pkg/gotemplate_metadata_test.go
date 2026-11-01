@@ -6,12 +6,146 @@ import (
 	"testing/fstest"
 
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
+	"github.com/k8s-manifest-kit/pkg/util/k8s"
 	"github.com/rs/xid"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	gotemplate "github.com/k8s-manifest-kit/renderer-gotemplate/pkg"
 
 	. "github.com/onsi/gomega"
 )
+
+// annotatedConfigMapTemplate emits an object carrying its own annotations,
+// including stale kit-managed keys, to characterize how renderer annotation
+// phases interact with pre-existing metadata.
+const annotatedConfigMapTemplate = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Repo }}-annotated
+  annotations:
+    existing: annotation
+    manifests.k8s-manifests-kit/content.hash: sha256:stale
+    manifests.k8s-manifests-kit/render.origin: stale
+data:
+  key: value
+`
+
+func renderTemplateSource(
+	t *testing.T,
+	template string,
+	values func(context.Context) (pkgtypes.Values, error),
+	opts ...gotemplate.RendererOption,
+) []unstructured.Unstructured {
+	t.Helper()
+
+	g := NewWithT(t)
+
+	renderer, err := gotemplate.New([]gotemplate.Source{{
+		FS:     fstest.MapFS{"templates/template.yaml.tpl": &fstest.MapFile{Data: []byte(template)}},
+		Path:   "templates/*.tpl",
+		Values: values,
+	}}, opts...)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	objects, err := renderer.Process(t.Context(), nil)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	return objects
+}
+
+func TestAnnotationApplication(t *testing.T) {
+	values := gotemplate.Values(map[string]any{"Repo": "annotation-app", "Component": "frontend"})
+
+	sourceKeys := map[string]string{
+		pkgtypes.AnnotationSourceType: "gotemplate",
+		pkgtypes.AnnotationSourcePath: "templates/*.tpl",
+		pkgtypes.AnnotationSourceFile: "template.yaml.tpl",
+	}
+
+	t.Run("hash covers source annotations before render origin", func(t *testing.T) {
+		g := NewWithT(t)
+
+		bare := renderTemplateSource(t, podTemplate, values,
+			gotemplate.WithContentHash(false))
+
+		expected := bare[0].DeepCopy()
+		expected.SetAnnotations(sourceKeys)
+
+		annotated := renderTemplateSource(t, podTemplate, values,
+			gotemplate.WithSourceAnnotations(true))
+
+		annotations := annotated[0].GetAnnotations()
+		g.Expect(annotations).To(HaveKeyWithValue(
+			pkgtypes.AnnotationContentHash,
+			k8s.ContentHash(expected),
+		))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationRenderOrigin, pkgtypes.RenderOriginLive))
+	})
+
+	t.Run("full annotation map matches the expected map", func(t *testing.T) {
+		g := NewWithT(t)
+
+		bare := renderTemplateSource(t, podTemplate, values,
+			gotemplate.WithContentHash(false))
+
+		expected := bare[0].DeepCopy()
+		expected.SetAnnotations(sourceKeys)
+
+		annotated := renderTemplateSource(t, podTemplate, values,
+			gotemplate.WithSourceAnnotations(true))
+
+		g.Expect(annotated[0].GetAnnotations()).To(Equal(map[string]string{
+			pkgtypes.AnnotationSourceType:   "gotemplate",
+			pkgtypes.AnnotationSourcePath:   "templates/*.tpl",
+			pkgtypes.AnnotationSourceFile:   "template.yaml.tpl",
+			pkgtypes.AnnotationContentHash:  k8s.ContentHash(expected),
+			pkgtypes.AnnotationRenderOrigin: pkgtypes.RenderOriginLive,
+		}))
+	})
+
+	t.Run("pre-existing annotations are preserved and included in the hash input", func(t *testing.T) {
+		g := NewWithT(t)
+
+		bare := renderTemplateSource(t, annotatedConfigMapTemplate, values,
+			gotemplate.WithContentHash(false))
+
+		expected := bare[0].DeepCopy()
+		expected.SetAnnotations(map[string]string{
+			"existing":                      "annotation",
+			pkgtypes.AnnotationContentHash:  "sha256:stale",
+			pkgtypes.AnnotationRenderOrigin: "stale",
+			pkgtypes.AnnotationSourceType:   "gotemplate",
+			pkgtypes.AnnotationSourcePath:   "templates/*.tpl",
+			pkgtypes.AnnotationSourceFile:   "template.yaml.tpl",
+		})
+
+		annotated := renderTemplateSource(t, annotatedConfigMapTemplate, values,
+			gotemplate.WithSourceAnnotations(true))
+
+		annotations := annotated[0].GetAnnotations()
+		g.Expect(annotations).To(HaveKeyWithValue("existing", "annotation"))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationContentHash, k8s.ContentHash(expected)))
+		g.Expect(annotations).NotTo(HaveKeyWithValue(pkgtypes.AnnotationContentHash, "sha256:stale"))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationRenderOrigin, pkgtypes.RenderOriginLive))
+	})
+
+	t.Run("source annotations without content hash leave no hash key", func(t *testing.T) {
+		g := NewWithT(t)
+
+		annotated := renderTemplateSource(t, podTemplate, values,
+			gotemplate.WithSourceAnnotations(true),
+			gotemplate.WithContentHash(false))
+
+		annotations := annotated[0].GetAnnotations()
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationSourceType, "gotemplate"))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationSourcePath, "templates/*.tpl"))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationSourceFile, "template.yaml.tpl"))
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationRenderOrigin, pkgtypes.RenderOriginLive))
+		g.Expect(annotations).NotTo(HaveKey(pkgtypes.AnnotationContentHash))
+	})
+}
 
 func TestSourceAnnotations(t *testing.T) {
 
