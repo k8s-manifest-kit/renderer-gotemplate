@@ -38,5 +38,5 @@ make check
 `make test/race`. Tests run offline against `testing/fstest.MapFS`; there is
 no live integration target.
 
-Use `testing/fstest.MapFS`, test invalid templates and missing values, preserve error context, and verify concurrent lazy loading when changing template initialization. Conventions and workflow details are in [Development](docs/development.md).
+Use `testing/fstest.MapFS`, test invalid templates and missing values, preserve error context, and verify concurrent lazy loading when changing template initialization. Keep tests focused and simple: use the smallest template fixture that proves the behavior, and add helpers or extra test files only when a concrete behavior or regression requires them. Conventions and workflow details are in [Development](docs/development.md).
 

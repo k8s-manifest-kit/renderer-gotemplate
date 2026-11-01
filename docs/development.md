@@ -95,6 +95,23 @@ by the renderer: when a renderer instance is shared by overlapping calls,
 such caller-supplied code must be safe for concurrent use. Register only
 pure functions in concurrency tests.
 
+### Test simplicity
+
+Use the simplest test that proves the contract under test. Don't re-test
+standard-library internals, and don't add helpers, mocks, instrumentation,
+subprocesses, or extra test files unless a concrete behavior or regression
+requires them. Keep small suites cohesive in one test file; the
+[concern-suffixed layout](#test-layout) below describes where a justified
+split goes, not a requirement to create those files.
+
+Keep fixtures proportional to the behavior under test: a small
+`fstest.MapFS` template with focused assertions on the rendered output is
+the default, reuse existing fixtures before creating new ones, and don't
+invent speculative edge-case matrices or generic template harnesses. The
+render-time merge, lazy-parse lifetime, cache-origin and source isolation,
+ownership, and concurrent-callback requirements above are unchanged by
+this rule.
+
 ### Test layout
 
 - Colocate tests with implementation. A `test/` subdirectory is a separate
