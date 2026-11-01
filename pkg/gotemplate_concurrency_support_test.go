@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
+	jqmatcher "github.com/lburgazzoli/gomega-matchers/pkg/matchers/jq"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -128,9 +129,12 @@ func expectSourceResults(
 func concurrencyRenderedValues(objects []unstructured.Unstructured) map[string]string {
 	rendered := make(map[string]string, len(objects))
 
+	extractRendered := jqmatcher.Extract(`.data.rendered`)
+
 	for _, obj := range objects {
-		value, _, _ := unstructured.NestedString(obj.Object, "data", "rendered")
-		rendered[obj.GetName()] = value
+		value, _ := extractRendered(obj.Object)
+		entry, _ := value.(string)
+		rendered[obj.GetName()] = entry
 	}
 
 	return rendered

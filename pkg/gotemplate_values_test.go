@@ -4,7 +4,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	jqmatcher "github.com/lburgazzoli/gomega-matchers/pkg/matchers/jq"
 
 	gotemplate "github.com/k8s-manifest-kit/renderer-gotemplate/pkg"
 
@@ -72,12 +72,12 @@ func TestRenderTimeValues(t *testing.T) {
 		g.Expect(objects).Should(HaveLen(1))
 
 		// Check merged values
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ShouldNot(HaveOccurred())
-		g.Expect(found).Should(BeTrue())
-		g.Expect(data["replicas"]).Should(Equal("3"))       // From render-time
-		g.Expect(data["tag"]).Should(Equal("v1.0"))         // From source (deep merge)
-		g.Expect(data["repository"]).Should(Equal("nginx")) // From render-time
+		g.Expect(objects[0].Object).Should(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["replicas"]`), Equal("3")),       // From render-time
+			WithTransform(jqmatcher.Extract(`.data["tag"]`), Equal("v1.0")),         // From source (deep merge)
+			WithTransform(jqmatcher.Extract(`.data["repository"]`), Equal("nginx")), // From render-time
+		))
 	})
 
 	t.Run("should work with nil source values", func(t *testing.T) {
@@ -105,10 +105,10 @@ func TestRenderTimeValues(t *testing.T) {
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(objects).Should(HaveLen(1))
 
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ShouldNot(HaveOccurred())
-		g.Expect(found).Should(BeTrue())
-		g.Expect(data["env"]).Should(Equal("production"))
+		g.Expect(objects[0].Object).Should(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["env"]`), Equal("production")),
+		))
 	})
 
 	t.Run("should work with empty render-time values", func(t *testing.T) {
@@ -135,10 +135,10 @@ func TestRenderTimeValues(t *testing.T) {
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(objects).Should(HaveLen(1))
 
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ShouldNot(HaveOccurred())
-		g.Expect(found).Should(BeTrue())
-		g.Expect(data["value"]).Should(Equal("source-value"))
+		g.Expect(objects[0].Object).Should(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("source-value")),
+		))
 	})
 
 	t.Run("should update cache key with render-time values", func(t *testing.T) {
@@ -171,8 +171,10 @@ func TestRenderTimeValues(t *testing.T) {
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(objects1).Should(HaveLen(1))
 
-		data1, _, _ := unstructured.NestedStringMap(objects1[0].Object, "data")
-		g.Expect(data1["value"]).Should(Equal("value1"))
+		g.Expect(objects1[0].Object).Should(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("value1")),
+		))
 
 		// Second render with different render-time values should not use cache
 		renderValues2 := map[string]any{
@@ -182,7 +184,9 @@ func TestRenderTimeValues(t *testing.T) {
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(objects2).Should(HaveLen(1))
 
-		data2, _, _ := unstructured.NestedStringMap(objects2[0].Object, "data")
-		g.Expect(data2["value"]).Should(Equal("value2"))
+		g.Expect(objects2[0].Object).Should(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("value2")),
+		))
 	})
 }

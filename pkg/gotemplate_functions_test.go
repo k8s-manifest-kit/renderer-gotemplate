@@ -6,7 +6,7 @@ import (
 	"testing/fstest"
 	"text/template"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	jqmatcher "github.com/lburgazzoli/gomega-matchers/pkg/matchers/jq"
 
 	gotemplate "github.com/k8s-manifest-kit/renderer-gotemplate/pkg"
 
@@ -55,10 +55,10 @@ func TestTemplateFunctions(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(objects).To(HaveLen(1))
 
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(found).To(BeTrue())
-		g.Expect(data["value"]).To(Equal("HELLO"))
+		g.Expect(objects[0].Object).To(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("HELLO")),
+		))
 	})
 
 	t.Run("should render with multiple registered functions", func(t *testing.T) {
@@ -90,10 +90,10 @@ func TestTemplateFunctions(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(objects).To(HaveLen(1))
 
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(found).To(BeTrue())
-		g.Expect(data["value"]).To(Equal("HELLO"))
+		g.Expect(objects[0].Object).To(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("HELLO")),
+		))
 	})
 
 	t.Run("should fail when helper is not registered", func(t *testing.T) {
@@ -158,9 +158,9 @@ func TestTemplateFunctions(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(objects).To(HaveLen(1))
 
-		data, found, err := unstructured.NestedStringMap(objects[0].Object, "data")
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(found).To(BeTrue())
-		g.Expect(data["value"]).To(Equal("\nenabled: true\nports:\n- 80\n- 443"))
+		g.Expect(objects[0].Object).To(And(
+			jqmatcher.Match(`.data | type == "object" and all(.[]; type == "string")`),
+			WithTransform(jqmatcher.Extract(`.data["value"]`), Equal("\nenabled: true\nports:\n- 80\n- 443")),
+		))
 	})
 }

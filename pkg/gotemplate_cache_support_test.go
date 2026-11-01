@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing/fstest"
 
+	jqmatcher "github.com/lburgazzoli/gomega-matchers/pkg/matchers/jq"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -32,8 +34,11 @@ func isolatedSourceFS(directory string, sourceName string) fstest.MapFS {
 func configMapSources(objects []unstructured.Unstructured) map[string]string {
 	sources := make(map[string]string, len(objects))
 
+	extractSource := jqmatcher.Extract(`.data.source`)
+
 	for _, obj := range objects {
-		source, _, _ := unstructured.NestedString(obj.Object, "data", "source")
+		value, _ := extractSource(obj.Object)
+		source, _ := value.(string)
 		sources[obj.GetName()] = source
 	}
 
