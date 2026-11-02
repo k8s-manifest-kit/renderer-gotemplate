@@ -2,9 +2,13 @@ package gotemplate_test
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
 	"testing"
 	"testing/fstest"
 
+	engine "github.com/k8s-manifest-kit/engine/pkg"
+	"github.com/k8s-manifest-kit/engine/pkg/render"
 	pkgtypes "github.com/k8s-manifest-kit/engine/pkg/types"
 	"github.com/k8s-manifest-kit/pkg/util/k8s"
 	"github.com/rs/xid"
@@ -439,4 +443,200 @@ func TestContentHash(t *testing.T) {
 		g.Expect(hash2).ShouldNot(BeEmpty())
 		g.Expect(hash1).ShouldNot(Equal(hash2))
 	})
+}
+
+// engineFirstConfigMapTemplate and engineSecondConfigMapTemplate feed the
+// engine-composition oracle. Each renderer instance owns an independent
+// immutable fixture rendering a distinguishable ConfigMap, so returned
+// objects are told apart by fixture identity rather than renderer name.
+const engineFirstConfigMapTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Name }}-engine-first
+data:
+  key: first
+`
+
+const engineSecondConfigMapTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Name }}-engine-second
+data:
+  key: second
+`
+
+// reingestConfigMapTemplate is the minimal first-stage fixture of the
+// re-ingest oracle: one ConfigMap with string data and one ordinary user
+// annotation, carrying no kit-managed keys and requiring no template values.
+const reingestConfigMapTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gotemplate-reingest
+  annotations:
+    example.com/owner: platform
+data:
+  key: value
+`
+
+// deepCopyObjects returns a deep copy of each object in the batch so later
+// renders cannot mutate a retained snapshot.
+func deepCopyObjects(objects []unstructured.Unstructured) []unstructured.Unstructured {
+	copies := make([]unstructured.Unstructured, len(objects))
+
+	for i := range objects {
+		copies[i] = *objects[i].DeepCopy()
+	}
+
+	return copies
+}
+
+// TestEngineHashPreservation pins that two real GoTemplate renderers produce,
+// behind the engine, exactly the objects and annotations their direct Process
+// calls produce: content hashes and all provenance annotations included,
+// unchanged across repeated uncached engine renders.
+func TestEngineHashPreservation(t *testing.T) {
+	g := NewWithT(t)
+
+	values := pkgtypes.Values{"Name": "engine-hash"}
+
+	newRenderer := func(t *testing.T, template string, file string) *gotemplate.Renderer {
+		t.Helper()
+
+		renderer, err := gotemplate.New([]gotemplate.Source{{
+			FS:   fstest.MapFS{"templates/" + file: &fstest.MapFile{Data: []byte(template)}},
+			Path: "templates/*.tpl",
+		}}, gotemplate.WithSourceAnnotations(true))
+		g.Expect(err).NotTo(HaveOccurred(), "renderer construction for "+file)
+
+		return renderer
+	}
+
+	firstRenderer := newRenderer(t, engineFirstConfigMapTemplate, "first.yaml.tpl")
+	secondRenderer := newRenderer(t, engineSecondConfigMapTemplate, "second.yaml.tpl")
+
+	// Direct baselines with the same effective values the engine supplies later.
+	firstBaseline, err := firstRenderer.Process(t.Context(), values)
+	g.Expect(err).NotTo(HaveOccurred(), "direct Process call of the first renderer")
+
+	secondBaseline, err := secondRenderer.Process(t.Context(), values)
+	g.Expect(err).NotTo(HaveOccurred(), "direct Process call of the second renderer")
+
+	firstSnapshot := deepCopyObjects(firstBaseline)
+	secondSnapshot := deepCopyObjects(secondBaseline)
+
+	for _, baseline := range []struct {
+		name    string
+		objects []unstructured.Unstructured
+	}{
+		{name: "first renderer", objects: firstSnapshot},
+		{name: "second renderer", objects: secondSnapshot},
+	} {
+		g.Expect(baseline.objects).NotTo(BeEmpty(), baseline.name+" baseline")
+
+		annotations := baseline.objects[0].GetAnnotations()
+		g.Expect(annotations[pkgtypes.AnnotationContentHash]).NotTo(BeEmpty(),
+			baseline.name+" baseline content hash")
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationSourceType, "gotemplate"),
+			baseline.name+" baseline source type")
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationSourcePath, "templates/*.tpl"),
+			baseline.name+" baseline source path")
+		g.Expect(annotations).To(HaveKey(pkgtypes.AnnotationSourceFile),
+			baseline.name+" baseline source file")
+		g.Expect(annotations).To(HaveKeyWithValue(pkgtypes.AnnotationRenderOrigin, pkgtypes.RenderOriginLive),
+			baseline.name+" baseline render origin")
+	}
+
+	e, err := engine.New(engine.WithRenderer(firstRenderer), engine.WithRenderer(secondRenderer))
+	g.Expect(err).NotTo(HaveOccurred(), "engine construction with both renderers")
+
+	expectedOrder := slices.Concat(firstSnapshot, secondSnapshot)
+
+	for _, call := range []string{"first engine render", "second engine render"} {
+		objects, err := e.Render(t.Context(), render.WithValues(values))
+		g.Expect(err).NotTo(HaveOccurred(), call)
+
+		g.Expect(objects).To(Equal(expectedOrder),
+			call+" must equal the concatenated direct-render baselines including hashes and provenance")
+	}
+
+	// The retained baseline objects themselves must survive the engine runs.
+	g.Expect(firstBaseline).To(Equal(firstSnapshot),
+		"the first renderer's direct baseline must remain unchanged by later engine renders")
+	g.Expect(secondBaseline).To(Equal(secondSnapshot),
+		"the second renderer's direct baseline must remain unchanged by later engine renders")
+}
+
+// TestAnnotatedOutputReingestion freezes the actual annotated output of a
+// first render, replays those exact bytes as a new static template source,
+// and verifies the one-hash oracle: both renders of the frozen source equal
+// the full expected object, whose only change is a new content hash covering
+// the previous one.
+func TestAnnotatedOutputReingestion(t *testing.T) {
+	g := NewWithT(t)
+
+	firstFS := fstest.MapFS{
+		"templates/configmap.yaml.tpl": &fstest.MapFile{Data: []byte(reingestConfigMapTemplate)},
+	}
+
+	firstRenderer, err := gotemplate.New([]gotemplate.Source{{
+		FS:   firstFS,
+		Path: "templates/*.tpl",
+	}}, gotemplate.WithSourceAnnotations(false))
+	g.Expect(err).NotTo(HaveOccurred(), "first-stage renderer construction")
+
+	firstObjects, err := firstRenderer.Process(t.Context(), nil)
+	g.Expect(err).NotTo(HaveOccurred(), "first-stage render")
+	g.Expect(firstObjects).To(HaveLen(1), "first-stage render should yield exactly one object")
+
+	frozen := *firstObjects[0].DeepCopy()
+
+	firstHash := frozen.GetAnnotations()[pkgtypes.AnnotationContentHash]
+	g.Expect(firstHash).NotTo(BeEmpty(), "first-stage render should produce a content hash")
+
+	// The exact serialized first output becomes the new static template source.
+	source, err := json.Marshal(frozen.Object)
+	g.Expect(err).NotTo(HaveOccurred(), "serializing the frozen first-stage output")
+
+	reingestFS := fstest.MapFS{
+		"templates/configmap.yaml.tpl": &fstest.MapFile{Data: slices.Clone(source)},
+	}
+
+	reingestRenderer, err := gotemplate.New([]gotemplate.Source{{
+		FS:   reingestFS,
+		Path: "templates/*.tpl",
+	}}, gotemplate.WithSourceAnnotations(false))
+	g.Expect(err).NotTo(HaveOccurred(), "re-ingest renderer construction")
+
+	expectedHash := k8s.ContentHash(frozen.DeepCopy())
+	g.Expect(expectedHash).NotTo(Equal(firstHash),
+		"the second-stage hash must differ from the first-pass hash for this fixture")
+
+	expected := *frozen.DeepCopy()
+	k8s.SetAnnotation(&expected, pkgtypes.AnnotationContentHash, expectedHash)
+
+	for _, call := range []string{"re-ingest render 1", "re-ingest render 2"} {
+		objects, err := reingestRenderer.Process(t.Context(), nil)
+		g.Expect(err).NotTo(HaveOccurred(), call)
+		g.Expect(objects).To(HaveLen(1), call+" should yield exactly one object")
+
+		g.Expect(objects[0]).To(Equal(expected),
+			call+" must equal the full expected object with exactly one content hash")
+
+		// Attributable spot checks on the surviving object shape.
+		annotations := objects[0].GetAnnotations()
+		g.Expect(annotations).To(HaveKeyWithValue("example.com/owner", "platform"),
+			call+" should preserve the ordinary user annotation")
+		g.Expect(annotations[pkgtypes.AnnotationContentHash]).To(Equal(expectedHash),
+			call+" should carry the replaced content hash")
+		g.Expect(objects[0].GetKind()).To(Equal("ConfigMap"), call+" should preserve the object kind")
+		g.Expect(objects[0].GetName()).To(Equal("gotemplate-reingest"), call+" should preserve the object name")
+		g.Expect(objects[0].Object["data"]).To(Equal(map[string]any{"key": "value"}),
+			call+" should preserve the string data")
+	}
+
+	// The first-stage output and the frozen source bytes stay untouched.
+	g.Expect(firstObjects[0]).To(Equal(frozen),
+		"the first-stage output must remain unchanged by later renders")
+	g.Expect(string(reingestFS["templates/configmap.yaml.tpl"].Data)).To(Equal(string(source)),
+		"the frozen second-stage source bytes must remain unchanged")
 }
