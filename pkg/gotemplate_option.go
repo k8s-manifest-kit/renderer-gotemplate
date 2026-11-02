@@ -13,6 +13,31 @@ import (
 type RendererOption = option.Option[RendererOptions]
 
 // RendererOptions is a struct-based option that can set multiple renderer options at once.
+//
+// Options apply left to right: each option sees the state left by the ones
+// before it. When RendererOptions is applied through ApplyTo, fields divide
+// into replacing, preserving, and merging groups:
+//
+//   - Filters, Transformers, PostRenderers, and SourceSelectors replace the
+//     target's slices, including when nil — a struct clears hooks and
+//     selectors that earlier options added.
+//   - SourceAnnotations and ContentHash replace the target's booleans,
+//     including when false.
+//   - A nil CacheOptions preserves the target's cache configuration; a
+//     non-nil CacheOptions applies its own field rules to the target's cache
+//     options, creating them if needed.
+//   - Funcs merge rather than replace: entries are copied into the target's
+//     function map, functions with matching names overwrite, and an empty or
+//     nil Funcs leaves previously registered functions untouched.
+//
+// Functional options change only their own field or append to a single
+// slice, so they compose with anything applied before or after. Note the
+// difference from a fresh constructor: New starts from defaults with content
+// hashing enabled, caching disabled, and no template functions, while
+// applying a RendererOptions struct replaces the hook, selector, and boolean
+// fields outright — a caller who wants content hashing after a struct must
+// set ContentHash: true in the struct (or follow it with
+// WithContentHash(true)).
 type RendererOptions struct {
 	// Filters are renderer-specific filters applied during Process().
 	Filters []types.Filter
@@ -27,20 +52,36 @@ type RendererOptions struct {
 	SourceSelectors []SourceSelector
 
 	// CacheOptions holds cache configuration. nil = caching disabled.
+	// Applying a RendererOptions struct with a nil CacheOptions preserves
+	// the previously configured cache (including disabled); a non-nil value
+	// applies its field rules on top of the previous configuration.
 	CacheOptions *cache.Options
 
 	// SourceAnnotations enables automatic addition of source tracking annotations.
+	// Applying a RendererOptions struct replaces this field, including with false.
 	SourceAnnotations bool
 
 	// ContentHash enables automatic addition of a SHA-256 content hash annotation.
-	// Default: true (enabled).
+	// Default: true (enabled) in a fresh constructor; applying a
+	// RendererOptions struct replaces this field, including with false, so a
+	// struct that wants hashing must set it to true explicitly.
 	ContentHash bool
 
 	// Funcs are renderer-level template functions available to all sources.
+	// Applying a RendererOptions struct merges this map into the previously
+	// registered functions — matching names overwrite, and an empty or nil
+	// map keeps the existing functions.
 	Funcs template.FuncMap
 }
 
 // ApplyTo applies the renderer options to the target configuration.
+//
+// Application follows the composition rules documented on RendererOptions:
+// hooks, selectors, and booleans replace their target fields (including
+// nil and false), a nil CacheOptions preserves the target's cache
+// configuration while a non-nil one applies its field rules on top, and
+// Funcs entries merge into the target's function map with matching names
+// overwriting.
 func (opts RendererOptions) ApplyTo(target *RendererOptions) {
 	target.Filters = opts.Filters
 	target.Transformers = opts.Transformers

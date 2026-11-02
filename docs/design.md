@@ -41,6 +41,62 @@ engine's global rejection is a separate, earlier boundary.
 Source annotations are opt-in. Content hashes use
 `manifests.k8s-manifests-kit/content.hash` and are enabled by default.
 
+### Option composition
+
+Renderer options apply left to right. Functional options touch a single
+field — `WithFilter`, `WithTransformer`, `WithPostRenderer`, and
+`WithSourceSelector` append, the boolean setters overwrite only their own
+field, and `WithFunc`/`WithFuncs` merge into the registered template
+functions — so they compose with anything around them. A
+`RendererOptions` struct is stronger: it replaces the hook, selector, and
+boolean fields outright (including with nil and false), while a nil
+`CacheOptions` preserves what earlier options configured and its `Funcs`
+map merges into the previously registered functions, with matching names
+overwriting and an empty map leaving them untouched.
+
+A hook before a struct survives only if the struct carries it; a hook after
+a struct is kept:
+
+```go
+// The struct clears the filter added before it and disables hashing:
+// its zero-valued Filters and ContentHash replace the previous state,
+// while its Funcs still merge with functions registered earlier.
+renderer, _ := gotemplate.New(sources,
+    gotemplate.WithFilter(keepPods),
+    gotemplate.RendererOptions{SourceAnnotations: true},
+    gotemplate.WithContentHash(true), // re-enables what the struct turned off
+)
+
+// Hook after struct: the post-renderer is appended to the struct's state.
+renderer, _ := gotemplate.New(sources,
+    gotemplate.RendererOptions{SourceAnnotations: true, ContentHash: true},
+    gotemplate.WithPostRenderer(label),
+)
+```
+
+A struct that wants hashing must set `ContentHash: true` explicitly; a
+`WithContentHash(true)` after the struct achieves the same. These rules
+govern the renderer's own options only — the engine's additive options
+(`engine.WithFilter` and friends) follow the engine's rules, not these.
+
+### Hash stages
+
+Objects decoded from a rendered template are annotated in one step after
+decoding and before the result is stored in the source's output cache:
+source annotations are applied first (when enabled), then the content hash.
+The render-origin stamp — live or cache — follows cache storage and
+retrieval, and the source, renderer, and engine hooks run last.
+
+Consequences callers can rely on: the hash covers the complete object at
+hashing time, including any metadata already present — previously applied
+source annotations participate, as does any pre-existing annotation. It is
+not a hash of the template's source bytes, and it is not idempotent. The
+render-origin stamp and cache retrieval never rehash, and mutations made by
+later hooks need not match the stored digest. The full annotation phase
+contract, including phase ordering and option reuse, is the engine's
+[annotation contract](../../engine/docs/design.md#annotations); this
+renderer follows it at the points described above.
+
 ## Output caching
 
 When caching is enabled, every registered source renders through its own
