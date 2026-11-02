@@ -94,7 +94,7 @@ not a hash of the template's source bytes, and it is not idempotent. The
 render-origin stamp and cache retrieval never rehash, and mutations made by
 later hooks need not match the stored digest. The full annotation phase
 contract, including phase ordering and option reuse, is the engine's
-[annotation contract](../../engine/docs/design.md#annotations); this
+[annotation contract](https://github.com/k8s-manifest-kit/engine/blob/main/docs/design.md#annotations); this
 renderer follows it at the points described above.
 
 ## Output caching
