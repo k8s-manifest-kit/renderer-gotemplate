@@ -33,6 +33,15 @@ type Source struct {
 	// Values provides data to be substituted into templates during rendering.
 	// Function is called during rendering to obtain dynamic values.
 	// Accessible within templates via dot notation (e.g., {{ .FieldName }}).
+	//
+	// The returned values are validated with maps.ValidateAcyclic before
+	// they are merged, on every render including output-cache hits: the
+	// traversal covers exactly the map[string]any and []any nodes the
+	// merge recurses into, and every other type is a leaf. A supported
+	// cyclic tree is rejected whole with an error wrapping maps.ErrCycle,
+	// even when render-time values would overlay and replace the cyclic
+	// branch. Retained values of other types, template functions, and
+	// encoders are outside that traversal and are not validated.
 	Values func(context.Context) (types.Values, error)
 
 	// PostRenderers are source-specific post-renderers applied to this source's output
@@ -97,7 +106,23 @@ func New(inputs []Source, opts ...RendererOption) (*Renderer, error) {
 
 // Process executes the rendering logic for all configured inputs.
 // This method is safe for concurrent use.
+//
+// A nil *Renderer returns types.ErrRendererNil with no objects instead of
+// panicking; Name and the constructors are unaffected by a nil receiver.
+//
+// For every selected source, render-time values are validated with
+// maps.ValidateAcyclic before they are cloned: the traversal covers exactly
+// the map[string]any and []any nodes the clone recurses into, and every
+// other type is a leaf. Cyclic render-time values are rejected with an
+// error wrapping maps.ErrCycle and naming the source's path pattern.
+// Values for sources that are not selected are neither validated by this
+// renderer nor passed to their callbacks; the engine's own global
+// rejection is separate.
 func (r *Renderer) Process(ctx context.Context, renderTimeValues types.Values) ([]unstructured.Unstructured, error) {
+	if r == nil {
+		return nil, types.ErrRendererNil
+	}
+
 	allObjects := make([]unstructured.Unstructured, 0)
 
 	for i := range r.inputs {
@@ -108,6 +133,14 @@ func (r *Renderer) Process(ctx context.Context, renderTimeValues types.Values) (
 
 		if !selected {
 			continue
+		}
+
+		// Cyclic render-time values cannot be deep-cloned, and the shared
+		// clone helper recurses without cycle detection. They are rejected
+		// here, naming the source's pattern, before the per-source clone
+		// runs; the renderSingle wrappers cannot identify the source.
+		if err := maps.ValidateAcyclic(renderTimeValues); err != nil {
+			return nil, fmt.Errorf("cyclic render-time values for gotemplate pattern %s: %w", r.inputs[i].Path, err)
 		}
 
 		sValues := renderTimeValues.DeepClone()
@@ -158,6 +191,19 @@ func (r *Renderer) values(
 		}
 
 		if v != nil {
+			// Source values are validated on every call, including output
+			// cache hits, because this merge recurses without cycle
+			// detection. The whole supported tree is rejected even when
+			// render-time values would overlay and replace the cyclic
+			// branch: a cycle anywhere in the merged input is rejected.
+			if err := maps.ValidateAcyclic(v); err != nil {
+				return nil, fmt.Errorf(
+					"cyclic source values for template pattern %q: %w",
+					holder.Path,
+					err,
+				)
+			}
+
 			sourceValues = v
 		}
 	}
